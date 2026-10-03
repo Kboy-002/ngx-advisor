@@ -50,7 +50,7 @@ def main():
     sched.add_job(job_daily_eod, CronTrigger(hour=16, minute=30))
     sched.add_job(job_daily_news, CronTrigger(hour=17, minute=15))
     sched.add_job(job_saturday_nudge, CronTrigger(day_of_week="sat", hour=8, minute=0))
-    sched.add_job(job_monthly_pick, CronTrigger(day_of_month=27, hour=8, minute=0))
+    sched.add_job(job_monthly_pick, CronTrigger(day=27, hour=8, minute=0))
     log.info("scheduler started (Africa/Lagos). Next: %s", sched.get_jobs() and "jobs armed")
     try:
         sched.start()
