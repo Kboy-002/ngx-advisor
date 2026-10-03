@@ -1,0 +1,86 @@
+# NGX Advisor — home-PC stack.
+# Usage: copy .env.example to .env, then `docker compose up -d --build`
+# Dashboard: http://localhost:8501 | API: http://localhost:8000/docs
+
+services:
+  db:
+    image: postgres:16
+    container_name: ngx-advisor-db
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ngx_advisor}
+      POSTGRES_USER: ${POSTGRES_USER:-ngx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set_in_env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ngx}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: ./app
+    container_name: ngx-advisor-app
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-ngx}:${POSTGRES_PASSWORD:?set_in_env}@db:5432/${POSTGRES_DB:-ngx_advisor}
+      TZ: Africa/Lagos
+    volumes:
+      - ./app:/code:ro
+      - uploads:/data/uploads
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+  scheduler:
+    build: ./app
+    container_name: ngx-advisor-scheduler
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-ngx}:${POSTGRES_PASSWORD:?set_in_env}@db:5432/${POSTGRES_DB:-ngx_advisor}
+      TZ: Africa/Lagos
+      RUN_SCHEDULER: "1"
+    volumes:
+      - ./app:/code:ro
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_started
+    command: python scheduler.py
+
+  dashboard:
+    build: ./dashboard
+    container_name: ngx-advisor-dashboard
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      API_URL: http://app:8000
+      TZ: Africa/Lagos
+    ports:
+      - "${DASHBOARD_PORT:-8501}:8501"
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  uploads:
