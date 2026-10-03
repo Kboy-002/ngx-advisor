@@ -17,13 +17,23 @@ log = logging.getLogger("ngx-scheduler")
 
 
 def job_daily_eod():
-    log.info("daily EOD: pulling NGX price list (free scrape)")
+    log.info("daily EOD: pulling NGX price list + ASI into Postgres")
     try:
-        from ingest import fetch_ngx_price_list
-        rows = fetch_ngx_price_list()
-        log.info("daily EOD: got %d symbols", len(rows))
+        from ingest import run_and_store
+        res = run_and_store()
+        log.info("daily EOD done: %s", res)
     except Exception as exc:  # never crash the scheduler
         log.warning("daily EOD failed: %s", exc)
+
+
+def job_daily_news():
+    log.info("daily news: collecting disclosures + RSS signals")
+    try:
+        from collector import run_all
+        res = run_all()
+        log.info("daily news done: %s", res)
+    except Exception as exc:
+        log.warning("daily news failed: %s", exc)
 
 
 def job_saturday_nudge():
@@ -38,6 +48,7 @@ def job_monthly_pick():
 def main():
     sched = BlockingScheduler(timezone="Africa/Lagos")
     sched.add_job(job_daily_eod, CronTrigger(hour=16, minute=30))
+    sched.add_job(job_daily_news, CronTrigger(hour=17, minute=15))
     sched.add_job(job_saturday_nudge, CronTrigger(day_of_week="sat", hour=8, minute=0))
     sched.add_job(job_monthly_pick, CronTrigger(day_of_month=27, hour=8, minute=0))
     log.info("scheduler started (Africa/Lagos). Next: %s", sched.get_jobs() and "jobs armed")

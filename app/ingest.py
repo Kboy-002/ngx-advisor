@@ -47,6 +47,61 @@ def fetch_ngx_price_list(url: str = NGX_PRICE_LIST_URL, timeout: float = 30.0) -
     return sorted(seen.values(), key=lambda x: x["symbol"])
 
 
+def fetch_asi() -> dict | None:
+    """Best-effort ASI: NGN Market snapshot first (needs key), else NGX homepage regex."""
+    import re as _re
+
+    if NGNMARKET_API_KEY:
+        try:
+            r = httpx.get(f"{NGNMARKET_BASE}/market/snapshot", timeout=20.0,
+                          headers={"Authorization": f"Bearer {NGNMARKET_API_KEY}"})
+            if r.status_code == 200:
+                j = r.json()
+                asi = j.get("asi") or (j.get("data") or {}).get("asi")
+                if asi:
+                    return {"asi": float(asi), "source": "ngnmarket"}
+        except Exception:
+            pass
+    try:
+        r = httpx.get("https://ngxgroup.com/", timeout=30.0, follow_redirects=True,
+                      headers={"User-Agent": "ngx-advisor/0.2 (personal research)"})
+        m = _re.search(r"All.?Share Index[^0-9]*([\d,]+\.\d{2})", r.text, _re.I)
+        if m:
+            return {"asi": float(m.group(1).replace(",", "")), "source": "ngx_homepage"}
+    except Exception:
+        pass
+    return None
+
+
+def run_and_store() -> dict:
+    """Daily EOD job body: prices + ASI into Postgres. Returns counts."""
+    from datetime import date as _date
+
+    import store
+
+    today = _date.today()
+    rows = fetch_ngx_price_list()
+    n = store.upsert_prices(rows, today) if rows else 0
+    asi = fetch_asi()
+    if asi:
+        store.save_market_snapshot(today, asi["asi"], asi["source"])
+    # Best-effort fundamentals refresh for a rotating slice (free-quota friendly).
+    if NGNMARKET_API_KEY and rows:
+        import datetime as _dt
+        day = _dt.date.today().timetuple().tm_yday
+        universe = sorted({r["symbol"] for r in rows})
+        part = [universe[(day + i) % len(universe)] for i in range(min(20, len(universe)))]
+        snap = fetch_ngnmarket_snapshot(part)
+        for sym, payload in snap.items():
+            data = payload.get("data", payload) if isinstance(payload, dict) else {}
+            fields = {k: data.get(k) for k in
+                      ("pe", "pb", "eps", "roe", "profit_margin", "revenue_growth",
+                       "eps_growth", "debt_equity", "dividend_yield") if data.get(k) is not None}
+            if fields:
+                store.upsert_fundamentals(sym, "latest", fields)
+    return {"prices": n, "asi": asi}
+
+
 def fetch_ngnmarket_snapshot(symbols: list[str]) -> dict:
     """Best-effort NGN Market fetch (needs free API key). Returns {symbol: {...}}."""
     if not NGNMARKET_API_KEY or not symbols:

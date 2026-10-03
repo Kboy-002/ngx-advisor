@@ -53,6 +53,11 @@ docker compose up -d --build
 | GET | `/health` | liveness |
 | GET | `/ingest/status` | live NGX scrape probe |
 | POST | `/portfolio/parse` | upload Afrinvest PDF → holdings + verdicts |
+| POST | `/ingest/run` | run daily EOD now (prices + ASI + fundamentals slice) |
+| POST | `/signals/collect` | run disclosure + RSS collector now |
+| POST | `/picks/generate` | full pipeline: rank universe, allocate cash, persist pick |
+| GET | `/picks` | stored monthly picks |
+| GET | `/picks/{YYYY-MM}/performance` | pick legs vs ASI since purchase |
 | POST | `/rank` | score candidates (growth weights + signal overlay) |
 | POST | `/allocate` | cash → 1-or-2 buy plan |
 
@@ -75,7 +80,7 @@ db/init.sql          # Postgres schema
 ## Roadmap
 
 - [x] Phase 1 (this repo): Docker stack, growth scoring, allocator, Afrinvest parser, dashboard
-- [ ] Phase 2: Postgres-backed auto-feed, signal collector cron, performance tracking (pick vs ASI)
+- [x] Phase 2: Postgres-backed auto-feed, signal collector cron, performance tracking (pick vs ASI)
 - [ ] Phase 3: paid API switch, email/WhatsApp nudge, backtests
 
 ## Disclaimer

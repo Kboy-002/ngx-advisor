@@ -15,7 +15,7 @@ API = os.getenv("API_URL", "http://localhost:8000")
 st.set_page_config(page_title="NGX Advisor", layout="wide")
 st.title("NGX Advisor — monthly growth picks (NGX)")
 
-tab_pick, tab_port = st.tabs(["This month's pick", "Portfolio (Saturday check)"])
+tab_pick, tab_port, tab_hist = st.tabs(["This month's pick", "Portfolio (Saturday check)", "History (pick vs ASI)"])
 
 with tab_pick:
     st.subheader("1. How much do you have this month?")
@@ -64,6 +64,52 @@ with tab_pick:
                     st.json(a.get("evidence", {}))
         except Exception as exc:
             st.error(f"Rank/allocate failed — is the API up at {API}? {exc}")
+
+    st.subheader("4. Generate & save this month's pick (uses stored DB feed)")
+    st.caption("Runs the full pipeline: DB prices → momentum from history → fundamentals → signals → rank → allocate → save. Needs a few daily EOD runs first.")
+    if st.button("Generate this month's pick"):
+        try:
+            r = httpx.post(f"{API}/picks/generate", json={"cash": cash}, timeout=120.0)
+            r.raise_for_status()
+            res = r.json()
+            if "error" in res:
+                st.warning(res["error"])
+            else:
+                st.success(f"Saved pick for {res['month']} (universe: {res['universe']} symbols)")
+                st.write(res.get("rationale", ""))
+                for a in res["picks"]:
+                    st.write(f"**{a['symbol']}** — {a['units']} units @ ₦{a['est_price']:,.2f} "
+                             f"= ₦{a['allocation_ngn']:,.2f} (score {a['score']}). {a.get('note','')}")
+                    with st.expander(f"Evidence — {a['symbol']}"):
+                        st.json(a.get("evidence", {}))
+        except Exception as exc:
+            st.error(f"Generate failed — is the API + DB up? {exc}")
+
+with tab_hist:
+    st.subheader("Past picks vs the market (ASI)")
+    try:
+        r = httpx.get(f"{API}/picks", timeout=30.0)
+        data = r.json().get("picks", [])
+        if not data:
+            st.info("No stored picks yet — generate one from the first tab.")
+        for p in data:
+            with st.expander(f"{p['month']} — ₦{p['cash']:,.0f} (ASI at pick: {p.get('asi_at_pick') or 'n/a'})"):
+                st.write(p.get("rationale", ""))
+                for leg in p["picks"]:
+                    st.write(f"**{leg['symbol']}** — {leg['units']} units @ ₦{leg['est_price']:,.2f} (score {leg['score']})")
+                try:
+                    pr = httpx.get(f"{API}/picks/{p['month']}/performance", timeout=30.0).json()
+                    if "asi_return_pct" in pr:
+                        st.write(f"ASI since pick: {pr['asi_return_pct']:+.2f}%")
+                    for leg in pr.get("legs", []):
+                        if "return_pct" in leg:
+                            st.write(f"{leg['symbol']}: {leg['return_pct']:+.2f}% (now ₦{leg['now_price']:,.2f})")
+                        else:
+                            st.write(f"{leg['symbol']}: awaiting fresh prices")
+                except Exception:
+                    st.caption("Performance unavailable (DB/prices still warming).")
+    except Exception as exc:
+        st.error(f"Could not load picks — is the API up at {API}? {exc}")
 
 with tab_port:
     st.subheader("Saturday check — upload your Afrinvest Valuation Statement (PDF)")

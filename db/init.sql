@@ -47,11 +47,20 @@ CREATE TABLE IF NOT EXISTS signals (
 );
 CREATE INDEX IF NOT EXISTS idx_signals_symbol ON signals(symbol);
 
+CREATE TABLE IF NOT EXISTS market_snapshots (
+  trade_date DATE PRIMARY KEY,
+  asi NUMERIC,
+  volume BIGINT,
+  value NUMERIC,
+  deals BIGINT,
+  source TEXT DEFAULT 'auto'
+);
 CREATE TABLE IF NOT EXISTS picks (
   id SERIAL PRIMARY KEY,
   month TEXT NOT NULL UNIQUE,       -- 'YYYY-MM'
   cash_amount NUMERIC NOT NULL,
   picks JSONB NOT NULL,             -- [{symbol, allocation_ngn, units, est_price, est_fees, score, evidence[], risks[]}]
   rationale TEXT,
+  asi_at_pick NUMERIC,
   created_at TIMESTAMPTZ DEFAULT now()
 );
