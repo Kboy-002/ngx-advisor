@@ -1,0 +1,106 @@
+/* Lagos Terminal — dark fintech theme for NGX Advisor. */
+
+/* ---- hero strip ---- */
+.hero {
+  background: linear-gradient(135deg, #1A1F2B 0%, #14261F 100%);
+  border: 1px solid #2A3348;
+  border-radius: 14px;
+  padding: 22px 26px;
+  margin-bottom: 18px;
+}
+.hero .label {
+  color: #8B94A3;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.hero .value {
+  color: #E8ECF1;
+  font-size: 2.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.hero .sub { color: #8B94A3; font-size: 0.95rem; }
+.up { color: #00D395; font-weight: 700; }
+.down { color: #FF5C5C; font-weight: 700; }
+
+/* ---- generic card ---- */
+.card {
+  background: #1A1F2B;
+  border: 1px solid #2A3348;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+.card h4 { margin: 0 0 4px 0; color: #E8ECF1; }
+.card .muted { color: #8B94A3; font-size: 0.9rem; }
+
+/* ---- pick hero ---- */
+.pick-hero {
+  background: linear-gradient(135deg, #0F2E25 0%, #1A1F2B 70%);
+  border: 1px solid #00D395;
+  border-radius: 14px;
+  padding: 24px 28px;
+  margin-bottom: 16px;
+}
+.pick-hero .action {
+  color: #00D395;
+  font-weight: 800;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+.pick-hero .ticker { font-size: 2rem; font-weight: 800; color: #FFFFFF; }
+.pick-hero .detail { font-size: 1.15rem; color: #E8ECF1; font-variant-numeric: tabular-nums; }
+.pick-hero .note { color: #8B94A3; font-size: 0.9rem; }
+
+/* ---- score bars ---- */
+.score-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+.score-row .name { width: 110px; color: #8B94A3; font-size: 0.85rem; }
+.score-row .track { flex: 1; background: #2A3348; border-radius: 6px; height: 10px; overflow: hidden; }
+.score-row .fill { background: linear-gradient(90deg, #00B386, #00D395); height: 10px; border-radius: 6px; }
+.score-row .num { width: 44px; text-align: right; color: #E8ECF1; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ---- badges ---- */
+.badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 20px;
+  margin-right: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.tier1 { background: rgba(201,162,39,.15); color: #C9A227; border: 1px solid #C9A227; }
+.tier2 { background: rgba(88,166,255,.12); color: #58A6FF; border: 1px solid #58A6FF; }
+.tier3 { background: rgba(139,148,163,.12); color: #8B94A3; border: 1px solid #5A6372; }
+
+/* ---- verdicts ---- */
+.verdict { border-left: 4px solid #8B94A3; }
+.verdict.HOLD { border-left-color: #00D395; }
+.verdict.PAUSE { border-left-color: #C9A227; }
+.verdict.TRIM { border-left-color: #FF5C5C; }
+.verdict.WATCH { border-left-color: #58A6FF; }
+
+/* ---- evidence ---- */
+.ev { color: #C9D1DC; font-size: 0.92rem; margin: 3px 0; }
+.sig { color: #8B94A3; font-size: 0.85rem; margin: 3px 0; }
+.sig a { color: #58A6FF; }
+
+/* ---- empty state ---- */
+.empty {
+  border: 1px dashed #2A3348;
+  border-radius: 12px;
+  padding: 28px;
+  text-align: center;
+  color: #8B94A3;
+}
+
+/* ---- sidebar polish ---- */
+section[data-testid="stSidebar"] { background: #11141D; }
+.cash-note { color: #8B94A3; font-size: 0.8rem; }
+.status-ok { color: #00D395; font-weight: 700; }
+.status-warn { color: #C9A227; font-weight: 700; }
+.status-bad { color: #FF5C5C; font-weight: 700; }

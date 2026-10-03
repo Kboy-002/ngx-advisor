@@ -98,6 +98,33 @@ def picks_performance(month: str):
         return {"error": str(exc)}
 
 
+@app.get("/portfolio/latest")
+def portfolio_latest():
+    try:
+        snap = store.latest_holdings()
+        if not snap:
+            return {"holdings": [], "empty": True}
+        return {**snap, "empty": False, "verdicts": weekly_verdicts(snap)}
+    except Exception as exc:
+        return {"holdings": [], "empty": True, "error": str(exc)}
+
+
+@app.get("/status")
+def status():
+    """Feed freshness for the sidebar dot: ASI date, symbols, signals, picks."""
+    out: dict = {"api": True}
+    try:
+        out["asi"] = store.latest_asi()
+        with __import__("db").conn() as c:
+            out["symbols"] = c.execute("SELECT COUNT(DISTINCT symbol) FROM prices_eod").fetchone()[0]
+            out["signals_7d"] = c.execute(
+                "SELECT COUNT(*) FROM signals WHERE created_at > now() - INTERVAL '7 days'").fetchone()[0]
+            out["picks"] = c.execute("SELECT COUNT(*) FROM picks").fetchone()[0]
+    except Exception as exc:
+        out["error"] = str(exc)
+    return out
+
+
 class Candidate(BaseModel):
     symbol: str
     price: float = Field(gt=0)

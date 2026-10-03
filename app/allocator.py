@@ -64,6 +64,7 @@ def allocate(cash: float, ranked: list[dict], portfolio: dict | None = None) -> 
             return [{"symbol": first["symbol"], "allocation_ngn": round(cost + fees, 2),
                      "units": u, "est_price": first["price"], "est_fees": fees,
                      "score": first["score"], "note": reason,
+                     "factor_scores": first.get("factor_scores", {}),
                      "evidence": first.get("evidence", {}), "risks": first.get("risks", [])}]
 
     # Two-way split, score-weighted, rounded to lots.
@@ -75,8 +76,10 @@ def allocate(cash: float, ranked: list[dict], portfolio: dict | None = None) -> 
     return [
         {"symbol": first["symbol"], "allocation_ngn": round(c1 + f1, 2), "units": u1,
          "est_price": first["price"], "est_fees": f1, "score": first["score"],
-         "note": reason, "evidence": first.get("evidence", {}), "risks": first.get("risks", [])},
+         "note": reason, "factor_scores": first.get("factor_scores", {}),
+         "evidence": first.get("evidence", {}), "risks": first.get("risks", [])},
         {"symbol": second["symbol"], "allocation_ngn": round(c2 + f2, 2), "units": u2,
          "est_price": second["price"], "est_fees": f2, "score": second["score"],
-         "note": reason, "evidence": second.get("evidence", {}), "risks": second.get("risks", [])},
+         "note": reason, "factor_scores": second.get("factor_scores", {}),
+         "evidence": second.get("evidence", {}), "risks": second.get("risks", [])},
     ]
