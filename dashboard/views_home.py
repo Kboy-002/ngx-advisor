@@ -56,7 +56,8 @@ def render() -> None:
     with c1:
         st.markdown("**Where your money sits**")
         if holdings:
-            st.plotly_chart(_donut(holdings), use_container_width=True)
+            st.plotly_chart(_donut(holdings), use_container_width=True,
+                            config={"displayModeBar": False})
         conc = max((h.get("acct_pct", 0) or 0 for h in holdings), default=0)
         if conc > 35:
             st.warning(f"One ticker is {conc:.0f}% of everything — fresh buys should diversify, not add to it.")

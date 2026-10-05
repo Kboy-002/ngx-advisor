@@ -17,15 +17,20 @@ def _comparison_chart(perfs: list[dict]):
         labels.append(p["month"])
         mine.append(round(avg, 2))
         asi.append(p["asi_return_pct"])
-    if not labels:
-        return None
+    if not labels or all(v == 0 for v in mine) and all(v == 0 for v in asi):
+        return None  # nothing has moved yet — caller shows the waiting state
     fig = go.Figure()
     fig.add_bar(x=labels, y=mine, name="My picks (avg)", marker_color="#00D395")
     fig.add_bar(x=labels, y=asi, name="NGX ASI", marker_color="#5A6372")
     fig.update_layout(barmode="group", height=300, margin=dict(t=10, b=10, l=10, r=10),
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                       font_color="#E8ECF1", yaxis_title="% since pick")
+    fig.update_xaxes(type="category")  # "2026-10" is a label, not a date
+    fig.update_yaxes(ticksuffix="%", zeroline=True, zerolinecolor="#2A3348")
     return fig
+
+
+CHART_CONFIG = {"displayModeBar": False}  # legend stays readable, no icon clutter
 
 
 def render() -> None:
@@ -46,7 +51,10 @@ def render() -> None:
             perfs.append(pr)
     fig = _comparison_chart(perfs)
     if fig:
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+    else:
+        st.info("Scoreboard starts counting from each pick's day — prices haven't moved since the "
+                "latest pick, so there's nothing to compare yet. Check back after the market moves.")
 
     for p in picks:
         legs = " + ".join(f"{l['symbol']} ×{l['units']}" for l in p.get("picks", []))
@@ -56,7 +64,10 @@ def render() -> None:
             legs_ret = [l for l in pr.get("legs", []) if "return_pct" in l]
             if legs_ret:
                 avg = sum(l["return_pct"] for l in legs_ret) / len(legs_ret)
-                line = f" · you {avg:+.1f}% vs ASI {pr['asi_return_pct']:+.1f}%"
+                if avg == 0 and pr["asi_return_pct"] == 0:
+                    line = " · made today — tracking from today's prices"
+                else:
+                    line = f" · you {avg:+.1f}% vs ASI {pr['asi_return_pct']:+.1f}%"
         st.markdown(
             f'<div class="card"><h4>{p["month"]} — {legs}</h4>'
             f'<div class="muted">{naira0(p.get("cash"))} deployed{line}</div></div>',
