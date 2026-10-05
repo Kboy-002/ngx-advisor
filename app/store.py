@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS market_snapshots (
 CREATE TABLE IF NOT EXISTS symbol_meta (
   symbol TEXT PRIMARY KEY, sector TEXT, name TEXT, updated_at TIMESTAMPTZ DEFAULT now()
 );
+ALTER TABLE prices_eod ADD COLUMN IF NOT EXISTS week_change_pct NUMERIC;
+ALTER TABLE prices_eod ADD COLUMN IF NOT EXISTS volume BIGINT;
 CREATE TABLE IF NOT EXISTS picks (
   id SERIAL PRIMARY KEY, month TEXT NOT NULL UNIQUE,
   cash_amount NUMERIC NOT NULL, picks JSONB NOT NULL, rationale TEXT,
@@ -70,13 +72,14 @@ def upsert_prices(rows: list[dict], trade_date: date, source: str = "ngx_scrape"
     with conn() as c:
         for r in rows:
             c.execute(
-                """INSERT INTO prices_eod (symbol, trade_date, close, day_change_pct, volume, source)
-                   VALUES (%s,%s,%s,%s,%s,%s)
+                """INSERT INTO prices_eod (symbol, trade_date, close, day_change_pct, week_change_pct, volume, source)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s)
                    ON CONFLICT (symbol, trade_date) DO UPDATE
                    SET close=EXCLUDED.close, day_change_pct=EXCLUDED.day_change_pct,
+                       week_change_pct=EXCLUDED.week_change_pct,
                        volume=EXCLUDED.volume, source=EXCLUDED.source""",
                 (r["symbol"], trade_date, r.get("close"), r.get("change_pct"),
-                 r.get("volume"), source),
+                 r.get("week_change_pct"), r.get("volume"), source),
             )
             n += 1
     return n
@@ -95,11 +98,13 @@ def latest_prices() -> list[dict]:
     """Most recent close per symbol plus its date."""
     with conn() as c:
         cur = c.execute(
-            """SELECT DISTINCT ON (symbol) symbol, close, trade_date, day_change_pct
+            """SELECT DISTINCT ON (symbol) symbol, close, trade_date, day_change_pct, week_change_pct, volume
                FROM prices_eod ORDER BY symbol, trade_date DESC"""
         )
         return [{"symbol": r[0], "close": float(r[1]), "date": str(r[2]),
-                 "change_pct": float(r[3]) if r[3] is not None else None}
+                 "change_pct": float(r[3]) if r[3] is not None else None,
+                 "week_change_pct": float(r[4]) if r[4] is not None else None,
+                 "volume": int(r[5]) if r[5] is not None else None}
                 for r in cur.fetchall()]
 
 

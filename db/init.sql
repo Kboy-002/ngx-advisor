@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS prices_eod (
   symbol TEXT NOT NULL,
   trade_date DATE NOT NULL,
   close NUMERIC, open NUMERIC, high NUMERIC, low NUMERIC,
-  volume BIGINT, value NUMERIC, day_change_pct NUMERIC,
+  volume BIGINT, value NUMERIC, day_change_pct NUMERIC, week_change_pct NUMERIC,
   source TEXT DEFAULT 'ngx_scrape',
   PRIMARY KEY (symbol, trade_date)
 );

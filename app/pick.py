@@ -59,6 +59,8 @@ def build_candidates() -> tuple[list[dict], bool]:
             value_in["sector_pe"] = round(sector_avg[str(sector).lower()], 1)
         hist = store.price_history(sym)
         mom = _returns(hist)
+        if p.get("week_change_pct") is not None:
+            mom.setdefault("ret_7d", round(p["week_change_pct"], 1))
         if not mom and p.get("change_pct") is not None:
             mom = {"ret_3m": round(p["change_pct"] * 20, 1)}  # seed until history warms
         else:
@@ -73,7 +75,10 @@ def build_candidates() -> tuple[list[dict], bool]:
             "quality": {k: f[k] for k in ("revenue_growth", "eps_growth", "roe",
                                           "profit_margin", "debt_equity") if f.get(k) is not None},
             "value": value_in,
-            "risk": {"suspended": False, **({"daily_value": 50_000_000} if len(hist) > 20 else {})},
+            "risk": {"suspended": False,
+                     **({"daily_value": float(p["volume"]) * float(p["close"])}
+                        if p.get("volume") else
+                        ({"daily_value": 50_000_000} if len(hist) > 20 else {}))},
             "dividend": {k: f[k] for k in ("dividend_yield",) if f.get(k) is not None},
             "signal_adj": adj, "signal_notes": notes,
             "risks": [f"Sector: {sector}"] +

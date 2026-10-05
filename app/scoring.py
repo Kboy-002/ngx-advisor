@@ -14,9 +14,12 @@ def _clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, x))
 
 
-def score_momentum(ret_3m=None, ret_6m=None, vs_asi_3m=None, pos_52w=None, vol_trend=None) -> tuple[float, list[str]]:
+def score_momentum(ret_3m=None, ret_6m=None, ret_7d=None, vs_asi_3m=None, pos_52w=None, vol_trend=None) -> tuple[float, list[str]]:
     ev: list[str] = []
     parts: list[float] = []
+    if ret_7d is not None:
+        parts.append(_clamp(50 + ret_7d * 4.0))
+        ev.append(f"7-day move {ret_7d:+.1f}%")
     if ret_3m is not None:
         parts.append(_clamp(50 + ret_3m * 1.5))
         ev.append(f"3-mo return {ret_3m:+.1f}%")

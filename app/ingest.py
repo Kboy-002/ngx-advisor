@@ -29,7 +29,10 @@ def fetch_kobo_stocks() -> tuple[list[dict], dict | None]:
             if rs.status_code != 200:
                 return [], None
             payload = rs.json()
-            items = payload if isinstance(payload, list) else payload.get("data", payload.get("stocks", []))
+            items = (payload.get("stocks") or payload.get("data")
+                     or payload.get("companies") or [])
+            if isinstance(payload, list):
+                items = payload
             rows = []
             for it in items:
                 sym = str(it.get("symbol", "")).strip().upper()
@@ -39,9 +42,12 @@ def fetch_kobo_stocks() -> tuple[list[dict], dict | None]:
                     close = float(it.get("current_price"))
                 except (TypeError, ValueError):
                     continue
+                td = (it.get("trade_date") or "")[:10] or None
                 rows.append({"symbol": sym, "close": close,
                              "change_pct": it.get("change_percent"),
+                             "week_change_pct": it.get("pct_change_7d"),
                              "volume": it.get("volume"),
+                             "trade_date": td,
                              "sector": it.get("sector"), "name": it.get("name"),
                              "pe": it.get("pe_ratio"), "suspended": False, "tag": ""})
             market = None
@@ -49,7 +55,10 @@ def fetch_kobo_stocks() -> tuple[list[dict], dict | None]:
                 rm = c.get(f"{KOBO_BASE}/api/ngxdata/market")
                 if rm.status_code == 200:
                     m = rm.json()
-                    market = {"asi": m.get("asi"), "source": "kobo"}
+                    d = m.get("data", m) if isinstance(m, dict) else {}
+                    if d.get("asi"):
+                        market = {"asi": float(d["asi"]), "source": "kobo",
+                                  "trade_date": (d.get("trade_date") or "")[:10] or None}
             except Exception:
                 pass
             return rows, market
@@ -129,7 +138,13 @@ def run_and_store() -> dict:
     if not rows:
         rows = fetch_ngx_price_list()
         source = "ngx_scrape"
-    n = store.upsert_prices(rows, today, source=source) if rows else 0
+    # Prefer the feed's own trade date (today on market days).
+    feed_day = today
+    if source == "kobo":
+        days = sorted({r["trade_date"] for r in rows if r.get("trade_date")})
+        if days:
+            feed_day = _date.fromisoformat(days[-1])
+    n = store.upsert_prices(rows, feed_day, source=source) if rows else 0
     # Sectors + P/E ride along with the Kobo snapshot — persist for scoring/guardrails.
     for r in rows:
         if r.get("sector") or r.get("name"):
@@ -145,7 +160,13 @@ def run_and_store() -> dict:
     else:
         asi = fetch_asi()
     if asi and asi.get("asi"):
-        store.save_market_snapshot(today, asi["asi"], asi.get("source", "auto"))
+        asi_day = feed_day
+        try:
+            if asi.get("trade_date"):
+                asi_day = _date.fromisoformat(asi["trade_date"])
+        except ValueError:
+            pass
+        store.save_market_snapshot(asi_day, asi["asi"], asi.get("source", "auto"))
     # Best-effort fundamentals refresh for a rotating slice (free-quota friendly).
     if NGNMARKET_API_KEY and rows:
         import datetime as _dt
