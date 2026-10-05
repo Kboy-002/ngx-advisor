@@ -14,9 +14,18 @@ def _clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, x))
 
 
+def _num(x, default=None):
+    try:
+        return float(x) if x is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
 def score_momentum(ret_3m=None, ret_6m=None, ret_7d=None, vs_asi_3m=None, pos_52w=None, vol_trend=None) -> tuple[float, list[str]]:
     ev: list[str] = []
     parts: list[float] = []
+    ret_3m, ret_6m, ret_7d = _num(ret_3m), _num(ret_6m), _num(ret_7d)
+    vs_asi_3m, pos_52w, vol_trend = _num(vs_asi_3m), _num(pos_52w), _num(vol_trend)
     if ret_7d is not None:
         parts.append(_clamp(50 + ret_7d * 4.0))
         ev.append(f"7-day move {ret_7d:+.1f}%")
@@ -43,6 +52,8 @@ def score_momentum(ret_3m=None, ret_6m=None, ret_7d=None, vs_asi_3m=None, pos_52
 def score_quality(rev_growth=None, eps_growth=None, roe=None, margin=None, debt_equity=None) -> tuple[float, list[str]]:
     ev: list[str] = []
     parts: list[float] = []
+    rev_growth, eps_growth, roe = _num(rev_growth), _num(eps_growth), _num(roe)
+    margin, debt_equity = _num(margin), _num(debt_equity)
     if rev_growth is not None:
         parts.append(_clamp(50 + rev_growth * 1.2))
         ev.append(f"Revenue growth {rev_growth:+.1f}% YoY")
@@ -65,6 +76,7 @@ def score_quality(rev_growth=None, eps_growth=None, roe=None, margin=None, debt_
 
 def score_value(pe=None, sector_pe=None, peg=None) -> tuple[float, list[str]]:
     ev: list[str] = []
+    pe, sector_pe, peg = _num(pe), _num(sector_pe), _num(peg)
     if pe is None or pe <= 0:
         return 50.0, ["No P/E — neutral"]
     base = _clamp(90 - (pe - 5) * 3)  # ~5x -> 90, ~15x -> 60, ~25x -> 30
@@ -79,6 +91,7 @@ def score_value(pe=None, sector_pe=None, peg=None) -> tuple[float, list[str]]:
 
 def score_risk(beta=None, drawdown=None, daily_value=None, suspended=False) -> tuple[float, list[str]]:
     ev: list[str] = []
+    beta, drawdown, daily_value = _num(beta), _num(drawdown), _num(daily_value)
     if suspended:
         return 0.0, ["Suspended/restricted tag — excluded"]
     parts: list[float] = []
@@ -99,6 +112,7 @@ def score_risk(beta=None, drawdown=None, daily_value=None, suspended=False) -> t
 
 def score_dividend_div(yield_pct=None, streak_years=None) -> tuple[float, list[str]]:
     # Tie-break only (5% weight): growth investor, small absolute payouts.
+    yield_pct = _num(yield_pct)
     if yield_pct is None:
         return 50.0, ["No dividend data — neutral (growth focus)"]
     s = _clamp(40 + (yield_pct or 0) * 4)

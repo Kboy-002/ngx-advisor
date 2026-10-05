@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS symbol_meta (
 );
 ALTER TABLE prices_eod ADD COLUMN IF NOT EXISTS week_change_pct NUMERIC;
 ALTER TABLE prices_eod ADD COLUMN IF NOT EXISTS volume BIGINT;
+ALTER TABLE symbol_meta ADD COLUMN IF NOT EXISTS market_cap NUMERIC;
 CREATE TABLE IF NOT EXISTS research_notes (
   id SERIAL PRIMARY KEY, published DATE, title TEXT NOT NULL,
   url TEXT UNIQUE, summary TEXT, asi_close NUMERIC,
@@ -161,23 +162,34 @@ def latest_fundamentals() -> dict:
                revenue_growth, eps_growth, debt_equity, dividend_yield, fcf_margin
                FROM fundamentals ORDER BY symbol, updated_at DESC"""
         )
+        def _f(v):
+            try:
+                return float(v) if v is not None else None
+            except (TypeError, ValueError):
+                return None
         out = {}
         for r in cur.fetchall():
-            out[r[0]] = {"period": r[1], "pe": r[2], "pb": r[3], "eps": r[4], "roe": r[5],
-                         "profit_margin": r[6], "revenue_growth": r[7], "eps_growth": r[8],
-                         "debt_equity": r[9], "dividend_yield": r[10], "fcf_margin": r[11]}
+            out[r[0]] = {"period": r[1], "pe": _f(r[2]), "pb": _f(r[3]), "eps": _f(r[4]),
+                         "roe": _f(r[5]), "profit_margin": _f(r[6]), "revenue_growth": _f(r[7]),
+                         "eps_growth": _f(r[8]), "debt_equity": _f(r[9]),
+                         "dividend_yield": _f(r[10]), "fcf_margin": _f(r[11])}
         return out
 
 
 # --- symbol meta (sector/name from live feed) ---
 
-def upsert_meta(symbol: str, sector: str | None, name: str | None) -> None:
+def upsert_meta(symbol: str, sector: str | None, name: str | None,
+                market_cap: float | None = None) -> None:
     with conn() as c:
         c.execute(
-            """INSERT INTO symbol_meta (symbol, sector, name) VALUES (%s,%s,%s)
-               ON CONFLICT (symbol) DO UPDATE SET sector=EXCLUDED.sector,
-               name=EXCLUDED.name, updated_at=now()""",
-            (symbol, sector, name),
+            """INSERT INTO symbol_meta (symbol, sector, name, market_cap)
+               VALUES (%s,%s,%s,%s)
+               ON CONFLICT (symbol) DO UPDATE SET
+               sector=COALESCE(EXCLUDED.sector, symbol_meta.sector),
+               name=COALESCE(EXCLUDED.name, symbol_meta.name),
+               market_cap=COALESCE(EXCLUDED.market_cap, symbol_meta.market_cap),
+               updated_at=now()""",
+            (symbol, sector, name, market_cap),
         )
 
 

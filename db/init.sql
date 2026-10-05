@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS symbol_meta (
   symbol TEXT PRIMARY KEY,
   sector TEXT,
   name TEXT,
+  market_cap NUMERIC,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS research_notes (

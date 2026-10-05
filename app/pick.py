@@ -79,7 +79,8 @@ def build_candidates() -> tuple[list[dict], bool]:
                      **({"daily_value": float(p["volume"]) * float(p["close"])}
                         if p.get("volume") else
                         ({"daily_value": 50_000_000} if len(hist) > 20 else {}))},
-            "dividend": {k: f[k] for k in ("dividend_yield",) if f.get(k) is not None},
+            "dividend": ({k: f[k] for k in ("streak_years",) if f.get(k) is not None}
+                         | ({"yield_pct": f["dividend_yield"]} if f.get("dividend_yield") is not None else {})),
             "signal_adj": adj, "signal_notes": notes,
             "risks": [f"Sector: {sector}"] +
                      ([f"{len(evts)} linked signal(s) in last 120d — see evidence"] if evts else []),
@@ -99,6 +100,16 @@ def generate_monthly_pick(cash: float, month: str | None = None) -> dict:
     if not cands:
         raise RuntimeError("No price data yet — run the daily EOD ingest first (GET /ingest/run).")
     ranked = scoring.rank_candidates(cands)
+    # Liquidity guardrail: can't deploy the ticket where it exceeds 20% of a
+    # day's typical naira turnover without moving the price against yourself.
+    liquid = [c for c in ranked
+              if not c.get("risk", {}).get("daily_value")
+              or cash <= 0.20 * float(c["risk"]["daily_value"])]
+    skipped = len(ranked) - len(liquid)
+    if liquid:
+        ranked = liquid
+    else:
+        skipped = 0  # nothing deployable; fall back to full list with warning
     portfolio = store.latest_holdings()
     meta2 = store.all_meta()
     def _sec(s: str) -> str:
@@ -114,14 +125,16 @@ def generate_monthly_pick(cash: float, month: str | None = None) -> dict:
     allocs = allocator.allocate(cash, ranked, pf)
     asi = store.latest_asi()
     rationale = (
-        f"Growth-first screen over {len(ranked)} symbols"
+        f"Growth-first screen over {len(cands)} symbols"
         + (" (price history still warming — momentum seeded, treat ranks as provisional)" if warming else "")
+        + (f". {skipped} thin name(s) excluded: ticket exceeds 20% of daily turnover." if skipped else "")
         + f". Concentration guardrails vs {len(pf['holdings']) if pf else 0} held tickers."
     )
     store.record_cash(month, cash)
     store.save_pick(month, cash, allocs, rationale, asi["asi"] if asi else None)
     return {"month": month, "cash": cash, "picks": allocs, "rationale": rationale,
-            "asi_at_pick": asi, "warming_up": warming, "universe": len(ranked)}
+            "asi_at_pick": asi, "warming_up": warming, "universe": len(cands),
+            "deployable": len(ranked)}
 
 
 def pick_performance(month: str) -> dict:

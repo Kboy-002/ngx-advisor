@@ -59,6 +59,15 @@ def job_saturday_digest():
         log.warning("weekly digest failed: %s", exc)
 
 
+def job_friday_fundamentals():
+    log.info("friday fundamentals: NGX P/E PDFs + topchor pages")
+    try:
+        from fundamentals import run_fundamentals
+        log.info("fundamentals done: %s", run_fundamentals())
+    except Exception as exc:
+        log.warning("fundamentals failed: %s", exc)
+
+
 def job_monthly_analysis():
     from datetime import date as _date
     log.info("monthly analysis: AI deep-dive for %s", _date.today().strftime("%Y-%m"))
@@ -88,6 +97,7 @@ def main():
     sched = BlockingScheduler(timezone="Africa/Lagos")
     sched.add_job(job_daily_eod, CronTrigger(hour=16, minute=30))
     sched.add_job(job_daily_news, CronTrigger(hour=17, minute=15))
+    sched.add_job(job_friday_fundamentals, CronTrigger(day_of_week="fri", hour=18, minute=30))
     sched.add_job(job_saturday_nudge, CronTrigger(day_of_week="sat", hour=8, minute=0))
     sched.add_job(job_saturday_digest, CronTrigger(day_of_week="sat", hour=9, minute=30))
     sched.add_job(job_monthly_pick, CronTrigger(day=27, hour=8, minute=0))

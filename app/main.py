@@ -63,6 +63,31 @@ def signals_collect():
         return {"error": str(exc)}
 
 
+@app.post("/ingest/fundamentals")
+def ingest_fundamentals():
+    """Weekly fundamentals refresh: NGX P/E PDFs + topchor pages (slow, ~minutes)."""
+    import fundamentals as fundmod
+
+    try:
+        return fundmod.run_fundamentals()
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+@app.post("/research/fetch")
+def research_fetch(backfill: bool = False):
+    import research as researchmod
+
+    try:
+        out = researchmod.fetch_weekly()
+        if backfill:
+            out["backfill"] = researchmod.backfill_archive()
+        out["editions"] = len(store.latest_research(200))
+        return out
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
 class PickRequest(BaseModel):
     cash: float = Field(gt=0)
     month: str | None = None  # 'YYYY-MM', defaults to current
@@ -166,20 +191,6 @@ def analyst_weekly_latest():
         return res or {"empty": True}
     except Exception as exc:
         return {"empty": True, "error": str(exc)}
-
-
-@app.post("/research/fetch")
-def research_fetch(backfill: bool = False):
-    import research as researchmod
-
-    try:
-        out = researchmod.fetch_weekly()
-        if backfill:
-            out["backfill"] = researchmod.backfill_archive()
-        out["editions"] = len(store.latest_research(200))
-        return out
-    except Exception as exc:
-        return {"error": str(exc)}
 
 
 class Candidate(BaseModel):
