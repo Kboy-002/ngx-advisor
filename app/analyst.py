@@ -113,6 +113,8 @@ def weekly_digest(week: str | None = None) -> dict:
                  "source": r[4], "date": str(r[5]) if r[5] else None} for r in cur.fetchall()]
     research = store.latest_research(1)
     pf = store.latest_holdings()
+    asi = store.asi_series(8)
+    asi_txt = ", ".join(f"{a['date']}={a['asi']:,.0f}" for a in reversed(asi)) or "no ASI on file"
     movers = ""
     if pf:
         hs = sorted(pf["holdings"], key=lambda h: abs(h.get("gain_pct", 0) or 0), reverse=True)[:6]
@@ -122,7 +124,7 @@ def weekly_digest(week: str | None = None) -> dict:
     res_txt = ""
     for r in research:
         res_txt += f"- {r['published']}: {r['title']} (ASI {r['asi_close'] or 'n/a'}) {r['url']}\n{(r['summary'] or '')[:1200]}\n"
-    user = (f"WEEK ENDING {week}.\nSIGNALS THIS WEEK:\n{sig_txt}\n\n"
+    user = (f"WEEK ENDING {week}.\nASI RECENT: {asi_txt}.\nSIGNALS THIS WEEK:\n{sig_txt}\n\n"
             f"AFRINVEST WEEKLY:\n{res_txt or '- none on file'}\n\n"
             f"PORTFOLIO MOVERS: {movers or 'no portfolio on file'}\n\n"
             "Return JSON: {\"headline\": \"one line\", \"market_summary\": \"3-4 sentences\", "
