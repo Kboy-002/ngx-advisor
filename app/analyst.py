@@ -127,9 +127,12 @@ def weekly_digest(week: str | None = None) -> dict:
     user = (f"WEEK ENDING {week}.\nASI RECENT: {asi_txt}.\nSIGNALS THIS WEEK:\n{sig_txt}\n\n"
             f"AFRINVEST WEEKLY:\n{res_txt or '- none on file'}\n\n"
             f"PORTFOLIO MOVERS: {movers or 'no portfolio on file'}\n\n"
-            "Return JSON: {\"headline\": \"one line\", \"market_summary\": \"3-4 sentences\", "
-            "\"what_moved\": [\"3-5 bullets with tickers\"], \"portfolio_notes\": [\"2-4 bullets tied to held names\"], "
-            "\"watch_next_week\": [\"2-3 bullets\"], \"sources\": [\"urls cited\"]}")
+            "Return JSON: {\"headline\": \"one line, under 12 words\", "
+            "\"market_summary\": \"max 3 sentences\", "
+            "\"what_moved\": [\"max 4 bullets, ONE sentence each, lead with the ticker\"], "
+            "\"portfolio_notes\": [\"max 3 bullets, ONE sentence each\"], "
+            "\"watch_next_week\": [\"max 3 bullets, ONE sentence each\"], "
+            "\"sources\": [\"urls cited\"]}")
     out = llm.chat_json(ANALYST_RULES, user, max_tokens=2000)
     payload = {"week": week, **out}
     store.save_digest(week, payload, _model())

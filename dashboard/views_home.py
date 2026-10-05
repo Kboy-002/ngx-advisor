@@ -85,28 +85,63 @@ def render() -> None:
         _pick_teaser(picks["picks"][0])
 
     st.divider()
-    st.markdown("### This week's brief")
+    _weekly_brief()
+
+
+def _weekly_brief() -> None:
+    from components import api_post
+
+    head, head_err = st.columns([3, 1])
+    with head:
+        st.markdown("### This week's brief")
+    with head_err:
+        refresh = st.button("↻ Refresh brief", help="Re-read the week's signals and rewrite this brief.")
+
+    if refresh:
+        with st.spinner("Reading the week…"):
+            res, err = api_post("/analyst/weekly", timeout=300.0)
+        if err or not res or res.get("error"):
+            st.warning("Couldn't refresh the brief — showing the last saved one.")
+        else:
+            st.success("Brief refreshed.")
+
     digest, _ = api_get("/analyst/weekly/latest")
-    if digest and not digest.get("empty") and digest.get("payload"):
-        p = digest["payload"]
-        st.markdown(f'<div class="card"><h4>{p.get("headline", "Weekly brief")}</h4>'
-                    f'<div class="muted">{p.get("market_summary", "")}</div></div>',
-                    unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**What moved**")
-            for b in p.get("what_moved", [])[:5]:
-                st.markdown(f"<div class='ev'>• {b}</div>", unsafe_allow_html=True)
-            st.markdown("**Watch next week**")
-            for b in p.get("watch_next_week", [])[:3]:
-                st.markdown(f"<div class='ev'>👀 {b}</div>", unsafe_allow_html=True)
-        with c2:
-            st.markdown("**Portfolio notes**")
-            for b in p.get("portfolio_notes", [])[:4]:
-                st.markdown(f"<div class='ev'>• {b}</div>", unsafe_allow_html=True)
-        st.caption(f"Week of {digest.get('week')} · model {digest.get('model', '?')}")
-    else:
+    if not digest or digest.get("empty") or not digest.get("payload"):
         st.caption("No weekly brief yet — it lands automatically every Saturday morning.")
+        return
+    p = digest["payload"]
+
+    st.markdown(
+        f'<div class="hero"><div class="label">Week of {digest.get("week")} · {digest.get("model", "?")}</div>'
+        f'<div class="value" style="font-size:1.5rem">{p.get("headline", "Weekly brief")}</div></div>',
+        unsafe_allow_html=True)
+
+    with st.container(border=True):
+        st.markdown("**Market summary**")
+        st.write(p.get("market_summary", "—"))
+
+    c1, c2 = st.columns(2)
+    with c1:
+        with st.container(border=True):
+            st.markdown("**What moved**")
+            items = p.get("what_moved", [])[:4] or ["Nothing notable tagged this week."]
+            for b in items:
+                st.markdown(f"• {b}")
+    with c2:
+        with st.container(border=True):
+            st.markdown("**Portfolio notes**")
+            items = p.get("portfolio_notes", [])[:3] or ["No portfolio notes this week."]
+            for b in items:
+                st.markdown(f"• {b}")
+
+    with st.container(border=True):
+        st.markdown("**Watch next week**")
+        for b in (p.get("watch_next_week", [])[:3] or ["—"]):
+            st.markdown(f"• {b}")
+
+    srcs = p.get("sources", []) or []
+    if srcs:
+        st.caption("Sources: " + " · ".join(f"[{s}]({s})" for s in srcs[:5]))
 
 
 def _pick_teaser(p: dict) -> None:
