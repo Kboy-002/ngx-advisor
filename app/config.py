@@ -4,6 +4,10 @@ import os
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 NGNMARKET_API_KEY = os.getenv("NGNMARKET_API_KEY", "")
 NGNMARKET_BASE = "https://api.ngnmarket.com/v1"
+# Kobo Terminal (ex NGX Pulse) — free Personal tier: instant key, 100 req/day.
+# Get one at https://koboterminal.com (API section) and set KOBO_API_KEY.
+KOBO_API_KEY = os.getenv("KOBO_API_KEY", "")
+KOBO_BASE = "https://koboterminal.com"
 NGX_PRICE_LIST_URL = os.getenv(
     "NGX_PRICE_LIST_URL", "https://ngxgroup.com/exchange/data/equities-price-list/"
 )

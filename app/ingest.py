@@ -10,7 +10,51 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 
-from config import NGNMARKET_API_KEY, NGNMARKET_BASE, NGX_PRICE_LIST_URL, SUSPENDED_TAGS
+from config import KOBO_API_KEY, KOBO_BASE, NGNMARKET_API_KEY, NGNMARKET_BASE, NGX_PRICE_LIST_URL, SUSPENDED_TAGS
+
+
+def fetch_kobo_stocks() -> tuple[list[dict], dict | None]:
+    """Kobo Terminal (ex NGX Pulse) — full NGX snapshot in 2 calls.
+
+    GET /api/ngxdata/stocks  -> all 150+ equities (price, change, volume, sector, PE)
+    GET /api/ngxdata/market  -> ASI + breadth. Personal (free) tier: 100 req/day.
+    Returns (rows, market). Empty rows = no key or failure (caller falls back).
+    """
+    if not KOBO_API_KEY:
+        return [], None
+    headers = {"X-API-Key": KOBO_API_KEY}
+    try:
+        with httpx.Client(timeout=25.0, headers=headers) as c:
+            rs = c.get(f"{KOBO_BASE}/api/ngxdata/stocks")
+            if rs.status_code != 200:
+                return [], None
+            payload = rs.json()
+            items = payload if isinstance(payload, list) else payload.get("data", payload.get("stocks", []))
+            rows = []
+            for it in items:
+                sym = str(it.get("symbol", "")).strip().upper()
+                if not sym or sym.startswith(("FG", "FGS")):
+                    continue
+                try:
+                    close = float(it.get("current_price"))
+                except (TypeError, ValueError):
+                    continue
+                rows.append({"symbol": sym, "close": close,
+                             "change_pct": it.get("change_percent"),
+                             "volume": it.get("volume"),
+                             "sector": it.get("sector"), "name": it.get("name"),
+                             "pe": it.get("pe_ratio"), "suspended": False, "tag": ""})
+            market = None
+            try:
+                rm = c.get(f"{KOBO_BASE}/api/ngxdata/market")
+                if rm.status_code == 200:
+                    m = rm.json()
+                    market = {"asi": m.get("asi"), "source": "kobo"}
+            except Exception:
+                pass
+            return rows, market
+    except Exception:
+        return [], None
 
 
 def fetch_ngx_price_list(url: str = NGX_PRICE_LIST_URL, timeout: float = 30.0) -> list[dict]:
@@ -80,11 +124,28 @@ def run_and_store() -> dict:
     import store
 
     today = _date.today()
-    rows = fetch_ngx_price_list()
-    n = store.upsert_prices(rows, today) if rows else 0
-    asi = fetch_asi()
-    if asi:
-        store.save_market_snapshot(today, asi["asi"], asi["source"])
+    rows, market = fetch_kobo_stocks()
+    source = "kobo"
+    if not rows:
+        rows = fetch_ngx_price_list()
+        source = "ngx_scrape"
+    n = store.upsert_prices(rows, today, source=source) if rows else 0
+    # Sectors + P/E ride along with the Kobo snapshot — persist for scoring/guardrails.
+    for r in rows:
+        if r.get("sector") or r.get("name"):
+            store.upsert_meta(r["symbol"], r.get("sector"), r.get("name"))
+        if r.get("pe") is not None:
+            try:
+                store.upsert_fundamentals(r["symbol"], "latest", {"pe": float(r["pe"])}, source="kobo")
+            except (TypeError, ValueError):
+                pass
+    asi = None
+    if market and market.get("asi"):
+        asi = market
+    else:
+        asi = fetch_asi()
+    if asi and asi.get("asi"):
+        store.save_market_snapshot(today, asi["asi"], asi.get("source", "auto"))
     # Best-effort fundamentals refresh for a rotating slice (free-quota friendly).
     if NGNMARKET_API_KEY and rows:
         import datetime as _dt

@@ -40,7 +40,10 @@ def allocate(cash: float, ranked: list[dict], portfolio: dict | None = None) -> 
     reason = "Single best idea dominates"
     if second:
         gap = first["score"] - second["score"]
-        s1, s2 = SECTORS.get(first["symbol"], "?"), SECTORS.get(second["symbol"], "?")
+        live = {c["symbol"]: c.get("sector_live") for c in ranked}
+        def _sec(s: str) -> str:
+            return live.get(s) or SECTORS.get(s, "?")
+        s1, s2 = _sec(first["symbol"]), _sec(second["symbol"])
         if gap <= 10 and s1 != s2:
             want_two, reason = True, f"Scores close ({gap:.0f}pt gap) and diversifies {s1} + {s2}"
         if portfolio:
@@ -50,8 +53,10 @@ def allocate(cash: float, ranked: list[dict], portfolio: dict | None = None) -> 
                 if (cur.get(first["symbol"], 0) + cash) / tot > MAX_SINGLE_TICKER_PCT:
                     want_two, reason = True, f"Caps {first['symbol']} concentration at {MAX_SINGLE_TICKER_PCT:.0%}"
                 sec_tot: dict[str, float] = {}
+                psectors = (portfolio.get("sectors") or {}) if portfolio else {}
                 for h in portfolio.get("holdings", []):
-                    sec_tot[SECTORS.get(h["symbol"], "?")] = sec_tot.get(SECTORS.get(h["symbol"], "?"), 0) + h.get("value", 0)
+                    sec = psectors.get(h["symbol"]) or SECTORS.get(h["symbol"], "?")
+                    sec_tot[sec] = sec_tot.get(sec, 0) + h.get("value", 0)
                 sec_tot[s1] = sec_tot.get(s1, 0) + cash
                 if sec_tot[s1] / tot > MAX_SECTOR_PCT:
                     want_two, reason = True, f"Caps {s1} sector at {MAX_SECTOR_PCT:.0%}"

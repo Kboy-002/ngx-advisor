@@ -38,6 +38,14 @@ def _returns(history: list[dict]) -> dict:
 def build_candidates() -> tuple[list[dict], bool]:
     prices = store.latest_prices()
     funds = store.latest_fundamentals()
+    meta = store.all_meta()
+    # Sector-average P/E from live feed data — value is measured against peers.
+    sector_pes: dict[str, list[float]] = {}
+    for sym, f in funds.items():
+        if f.get("pe"):
+            sec = (meta.get(sym, {}).get("sector") or SECTORS.get(sym, "other") or "other").lower()
+            sector_pes.setdefault(sec, []).append(float(f["pe"]))
+    sector_avg = {s: sum(v) / len(v) for s, v in sector_pes.items() if v}
     cands: list[dict] = []
     thin = True
     for p in prices:
@@ -45,6 +53,10 @@ def build_candidates() -> tuple[list[dict], bool]:
         if any(t in sym for t in ("FG", "FGS")):
             continue
         f = funds.get(sym, {})
+        sector = meta.get(sym, {}).get("sector") or SECTORS.get(sym, "unmapped")
+        value_in = {k: f[k] for k in ("pe",) if f.get(k) is not None}
+        if value_in.get("pe") and str(sector).lower() in sector_avg:
+            value_in["sector_pe"] = round(sector_avg[str(sector).lower()], 1)
         hist = store.price_history(sym)
         mom = _returns(hist)
         if not mom and p.get("change_pct") is not None:
@@ -60,11 +72,11 @@ def build_candidates() -> tuple[list[dict], bool]:
             "momentum": mom,
             "quality": {k: f[k] for k in ("revenue_growth", "eps_growth", "roe",
                                           "profit_margin", "debt_equity") if f.get(k) is not None},
-            "value": {k: f[k] for k in ("pe",) if f.get(k) is not None},
+            "value": value_in,
             "risk": {"suspended": False, **({"daily_value": 50_000_000} if len(hist) > 20 else {})},
             "dividend": {k: f[k] for k in ("dividend_yield",) if f.get(k) is not None},
             "signal_adj": adj, "signal_notes": notes,
-            "risks": [f"Sector: {SECTORS.get(sym, 'unmapped')}"] +
+            "risks": [f"Sector: {sector}"] +
                      ([f"{len(evts)} linked signal(s) in last 120d — see evidence"] if evts else []),
         })
     warming = all(len(store.price_history(p["symbol"])) < 40 for p in prices[:5]) if prices else True
@@ -83,11 +95,17 @@ def generate_monthly_pick(cash: float, month: str | None = None) -> dict:
         raise RuntimeError("No price data yet — run the daily EOD ingest first (GET /ingest/run).")
     ranked = scoring.rank_candidates(cands)
     portfolio = store.latest_holdings()
+    meta2 = store.all_meta()
+    def _sec(s: str) -> str:
+        return meta2.get(s, {}).get("sector") or SECTORS.get(s, "other")
     pf = None
     if portfolio:
         pf = {"holdings": [{"symbol": h["symbol"], "value": h["value"]}
                            for h in portfolio["holdings"]],
-              "total_value": portfolio["total_value"]}
+              "total_value": portfolio["total_value"],
+              "sectors": {h["symbol"]: _sec(h["symbol"]) for h in portfolio["holdings"]}}
+    for c in ranked:
+        c["sector_live"] = _sec(c["symbol"])
     allocs = allocator.allocate(cash, ranked, pf)
     asi = store.latest_asi()
     rationale = (

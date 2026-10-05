@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS market_snapshots (
   trade_date DATE PRIMARY KEY, asi NUMERIC,
   volume BIGINT, value NUMERIC, deals BIGINT, source TEXT DEFAULT 'auto'
 );
+CREATE TABLE IF NOT EXISTS symbol_meta (
+  symbol TEXT PRIMARY KEY, sector TEXT, name TEXT, updated_at TIMESTAMPTZ DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS picks (
   id SERIAL PRIMARY KEY, month TEXT NOT NULL UNIQUE,
   cash_amount NUMERIC NOT NULL, picks JSONB NOT NULL, rationale TEXT,
@@ -62,16 +65,18 @@ def ensure_schema() -> None:
 
 # --- prices ---
 
-def upsert_prices(rows: list[dict], trade_date: date) -> int:
+def upsert_prices(rows: list[dict], trade_date: date, source: str = "ngx_scrape") -> int:
     n = 0
     with conn() as c:
         for r in rows:
             c.execute(
-                """INSERT INTO prices_eod (symbol, trade_date, close, day_change_pct, source)
-                   VALUES (%s,%s,%s,%s,'ngx_scrape')
+                """INSERT INTO prices_eod (symbol, trade_date, close, day_change_pct, volume, source)
+                   VALUES (%s,%s,%s,%s,%s,%s)
                    ON CONFLICT (symbol, trade_date) DO UPDATE
-                   SET close=EXCLUDED.close, day_change_pct=EXCLUDED.day_change_pct""",
-                (r["symbol"], trade_date, r.get("close"), r.get("change_pct")),
+                   SET close=EXCLUDED.close, day_change_pct=EXCLUDED.day_change_pct,
+                       volume=EXCLUDED.volume, source=EXCLUDED.source""",
+                (r["symbol"], trade_date, r.get("close"), r.get("change_pct"),
+                 r.get("volume"), source),
             )
             n += 1
     return n
@@ -144,6 +149,24 @@ def latest_fundamentals() -> dict:
                          "profit_margin": r[6], "revenue_growth": r[7], "eps_growth": r[8],
                          "debt_equity": r[9], "dividend_yield": r[10], "fcf_margin": r[11]}
         return out
+
+
+# --- symbol meta (sector/name from live feed) ---
+
+def upsert_meta(symbol: str, sector: str | None, name: str | None) -> None:
+    with conn() as c:
+        c.execute(
+            """INSERT INTO symbol_meta (symbol, sector, name) VALUES (%s,%s,%s)
+               ON CONFLICT (symbol) DO UPDATE SET sector=EXCLUDED.sector,
+               name=EXCLUDED.name, updated_at=now()""",
+            (symbol, sector, name),
+        )
+
+
+def all_meta() -> dict:
+    with conn() as c:
+        cur = c.execute("SELECT symbol, sector, name FROM symbol_meta")
+        return {r[0]: {"sector": r[1], "name": r[2]} for r in cur.fetchall()}
 
 
 # --- cash / picks / holdings / signals ---
