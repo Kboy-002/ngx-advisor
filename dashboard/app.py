@@ -46,7 +46,6 @@ else:
 
 page = st.sidebar.radio("Go to", ["Home", "This Month", "Saturday Check", "History"],
                         captions=["Wealth overview", "What to buy now", "Weekly PDF review", "You vs the market"])
-st.sidebar.caption(f"Talking to {API}")
 
 # --- pages ---
 if page == "Home":
