@@ -86,6 +86,13 @@ CREATE TABLE IF NOT EXISTS digests (
   model TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS earnings_extracts (
+  id SERIAL PRIMARY KEY,
+  url TEXT NOT NULL UNIQUE,
+  symbol TEXT,
+  payload JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS picks (
   id SERIAL PRIMARY KEY,
   month TEXT NOT NULL UNIQUE,       -- 'YYYY-MM'

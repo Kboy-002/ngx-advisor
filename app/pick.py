@@ -89,17 +89,40 @@ def build_candidates() -> tuple[list[dict], bool]:
     return cands, warming
 
 
-def _sector_of(sym: str) -> str:
-    return SECTORS.get(sym, "other")
+def apply_analyst_overlay(ranked: list[dict], analysis: dict) -> tuple[list[dict], list[str]]:
+    """Fold analyst verdicts back into quant scores, transparently.
+
+    AVOID -15, NEUTRAL 0, BUY +5. Returns (adjusted_ranked, reconciliation_notes).
+    """
+    adj_map = {"AVOID": -15.0, "NEUTRAL": 0.0, "BUY": 5.0}
+    verdicts = {a.get("symbol"): a for a in (analysis.get("analyses") or [])}
+    notes: list[str] = []
+    for c in ranked:
+        v = verdicts.get(c["symbol"])
+        if not v:
+            c["analyst_overlay"] = 0.0
+            continue
+        adj = adj_map.get(str(v.get("verdict", "NEUTRAL")).upper(), 0.0)
+        c["analyst_overlay"] = adj
+        c["score"] = round(max(0.0, min(100.0, c["score"] + adj)), 1)
+        notes.append(f"{c['symbol']}: quant {c.get('quant_score', c['score'])} "
+                     f"× analyst {v.get('verdict')} (conf {v.get('confidence')}) → {c['score']}")
+    ranked.sort(key=lambda x: x["score"], reverse=True)
+    for i, c in enumerate(ranked, 1):
+        c["rank"] = i
+    return ranked, notes
 
 
-def generate_monthly_pick(cash: float, month: str | None = None) -> dict:
-    """Full pipeline: ingest-touched DB -> ranked -> allocated -> persisted."""
+def generate_monthly_pick(cash: float, month: str | None = None,
+                          analyze: bool = False) -> dict:
+    """Full pipeline: DB -> ranked -> (optional AI deep-dive overlay) -> allocated -> persisted."""
     month = month or date.today().strftime("%Y-%m")
     cands, warming = build_candidates()
     if not cands:
         raise RuntimeError("No price data yet — run the daily EOD ingest first (GET /ingest/run).")
     ranked = scoring.rank_candidates(cands)
+    for c in ranked:
+        c["quant_score"] = c["score"]
     # Liquidity guardrail: can't deploy the ticket where it exceeds 20% of a
     # day's typical naira turnover without moving the price against yourself.
     liquid = [c for c in ranked
@@ -110,6 +133,12 @@ def generate_monthly_pick(cash: float, month: str | None = None) -> dict:
         ranked = liquid
     else:
         skipped = 0  # nothing deployable; fall back to full list with warning
+    reconciliation: list[str] = []
+    analysis = None
+    if analyze:
+        import analyst as analystmod
+        analysis = analystmod.monthly_analysis(cash, month)
+        ranked, reconciliation = apply_analyst_overlay(ranked, analysis)
     portfolio = store.latest_holdings()
     meta2 = store.all_meta()
     def _sec(s: str) -> str:
@@ -128,13 +157,15 @@ def generate_monthly_pick(cash: float, month: str | None = None) -> dict:
         f"Growth-first screen over {len(cands)} symbols"
         + (" (price history still warming — momentum seeded, treat ranks as provisional)" if warming else "")
         + (f". {skipped} thin name(s) excluded: ticket exceeds 20% of daily turnover." if skipped else "")
+        + (f". AI overlay applied: {'; '.join(reconciliation)}." if reconciliation else "")
         + f". Concentration guardrails vs {len(pf['holdings']) if pf else 0} held tickers."
     )
     store.record_cash(month, cash)
     store.save_pick(month, cash, allocs, rationale, asi["asi"] if asi else None)
     return {"month": month, "cash": cash, "picks": allocs, "rationale": rationale,
             "asi_at_pick": asi, "warming_up": warming, "universe": len(cands),
-            "deployable": len(ranked)}
+            "deployable": len(ranked), "reconciliation": reconciliation,
+            "analyzed": analysis is not None}
 
 
 def pick_performance(month: str) -> dict:

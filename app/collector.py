@@ -59,13 +59,15 @@ ALIASES = {
 RULES = [
     (("acquisition", "acquires", "acquire", "merger", "takeover", "buyout", "completes purchase"), "M&A_DEAL"),
     (("insider", "stake", "accumulates", "increases stake", "acquires shares", "otedola", "director dealing"), "INSIDER_BUYING"),
-    (("profit jumps", "profit surges", "beats", "record profit", "growth of", "q1", "q2", "q3", "full year", "results"), "EARNINGS_BEAT"),
+    (("profit jumps", "profit surges", "beats", "record profit"), "EARNINGS_BEAT"),
     (("loss", "profit falls", "profit drops", "misses", "decline in profit"), "EARNINGS_MISS"),
     (("dividend", "payout", "final dividend", "interim dividend"), "DIVIDEND_DECLARED"),
     (("bonus issue", "share split", "stock split"), "BONUS_SPLIT"),
     (("lists on ngx", "listing by introduction", "ipo", "public offer"), "NEW_LISTING"),
     (("sec approves", "approval", "license", "regulatory"), "REGULATORY_APPROVAL"),
     (("appoints", "resigns", "new ceo", "new chairman", "board"), "MANAGEMENT_CHANGE"),
+    (("reports", "results", "earnings", "revenue", "nine months", "half-year", "half year",
+       "unaudited", "audited", "q1", "q2", "q3", "q4", "h1", "fy", "full year", "profit"), "EARNINGS"),
 ]
 
 

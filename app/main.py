@@ -74,6 +74,17 @@ def ingest_fundamentals():
         return {"error": str(exc)}
 
 
+@app.post("/ingest/earnings")
+def ingest_earnings():
+    """Extract revenue/PAT/EPS growth from recent earnings articles (uses LLM key)."""
+    import earnings as earningsmod
+
+    try:
+        return earningsmod.run_earnings()
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
 @app.post("/research/fetch")
 def research_fetch(backfill: bool = False):
     import research as researchmod
@@ -91,6 +102,7 @@ def research_fetch(backfill: bool = False):
 class PickRequest(BaseModel):
     cash: float = Field(gt=0)
     month: str | None = None  # 'YYYY-MM', defaults to current
+    analyze: bool = False  # run AI deep-dive first; verdicts adjust scores
 
 
 @app.post("/picks/generate")
@@ -98,7 +110,7 @@ def picks_generate(req: PickRequest):
     import pick as pickpipe
 
     try:
-        return pickpipe.generate_monthly_pick(req.cash, req.month)
+        return pickpipe.generate_monthly_pick(req.cash, req.month, analyze=req.analyze)
     except Exception as exc:
         return {"error": str(exc)}
 

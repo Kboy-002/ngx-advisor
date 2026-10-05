@@ -69,6 +69,8 @@ def allocate(cash: float, ranked: list[dict], portfolio: dict | None = None) -> 
             return [{"symbol": first["symbol"], "allocation_ngn": round(cost + fees, 2),
                      "units": u, "est_price": first["price"], "est_fees": fees,
                      "score": first["score"], "note": reason,
+                     "quant_score": first.get("quant_score", first["score"]),
+                     "analyst_overlay": first.get("analyst_overlay", 0.0),
                      "factor_scores": first.get("factor_scores", {}),
                      "evidence": first.get("evidence", {}), "risks": first.get("risks", [])}]
 
@@ -81,10 +83,14 @@ def allocate(cash: float, ranked: list[dict], portfolio: dict | None = None) -> 
     return [
         {"symbol": first["symbol"], "allocation_ngn": round(c1 + f1, 2), "units": u1,
          "est_price": first["price"], "est_fees": f1, "score": first["score"],
-         "note": reason, "factor_scores": first.get("factor_scores", {}),
+         "note": reason, "quant_score": first.get("quant_score", first["score"]),
+         "analyst_overlay": first.get("analyst_overlay", 0.0),
+         "factor_scores": first.get("factor_scores", {}),
          "evidence": first.get("evidence", {}), "risks": first.get("risks", [])},
         {"symbol": second["symbol"], "allocation_ngn": round(c2 + f2, 2), "units": u2,
          "est_price": second["price"], "est_fees": f2, "score": second["score"],
-         "note": reason, "factor_scores": second.get("factor_scores", {}),
+         "note": reason, "quant_score": second.get("quant_score", second["score"]),
+         "analyst_overlay": second.get("analyst_overlay", 0.0),
+         "factor_scores": second.get("factor_scores", {}),
          "evidence": second.get("evidence", {}), "risks": second.get("risks", [])},
     ]

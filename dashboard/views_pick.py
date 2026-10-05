@@ -23,12 +23,17 @@ def _evidence_block(ev: dict) -> None:
 
 def _pick_cards(picks: list[dict]) -> None:
     for a in picks:
+        recon = ""
+        if a.get("analyst_overlay"):
+            sign = "+" if a["analyst_overlay"] > 0 else ""
+            recon = (f'<div class="note">Quant {a.get("quant_score", a.get("score"))} '
+                     f'× analyst overlay {sign}{a["analyst_overlay"]:.0f} → final {a.get("score")}</div>')
         st.markdown(
             f'<div class="pick-hero"><div class="action">Buy · score {a.get("score")}</div>'
             f'<div class="ticker">{a["symbol"]}</div>'
             f'<div class="detail">{a["units"]} units @ {naira(a["est_price"])} = '
             f'{naira(a["allocation_ngn"])} <span class="muted">(fees ~{naira(a.get("est_fees"))})</span></div>'
-            f'<div class="note">{a.get("note", "")}</div></div>',
+            f'<div class="note">{a.get("note", "")}</div>{recon}</div>',
             unsafe_allow_html=True)
         with st.expander(f"Why {a['symbol']} — evidence trail", expanded=False):
             st.markdown("**Score breakdown**")
@@ -103,6 +108,8 @@ def render(cash: float) -> None:
         gen = st.button("✨ Generate this month's pick", type="primary")
     with col2:
         refresh = st.button("↻ Refresh market feed")
+    with_ai = st.toggle("Include AI deep-dive (slower, reconciles analyst verdicts into scores)",
+                        value=True)
 
     if refresh:
         with st.spinner("Pulling today's NGX prices…"):
@@ -115,7 +122,9 @@ def render(cash: float) -> None:
 
     if gen:
         with st.spinner("Screening the market for your cash…"):
-            res, err = api_post("/picks/generate", json={"cash": cash}, timeout=120.0)
+            res, err = api_post("/picks/generate",
+                                json={"cash": cash, "analyze": with_ai},
+                                timeout=300.0)
         if err or not res or res.get("error"):
             st.warning(res.get("error") if res else
                        "The engine isn't reachable. Check the status dot in the sidebar.")

@@ -7,7 +7,7 @@ Tiers: 1 = NGX filing, 2 = company IR, 3 = press/rumour.
 from __future__ import annotations
 
 EVENT_TYPES = (
-    "M&A_DEAL", "INSIDER_BUYING", "EARNINGS_BEAT", "EARNINGS_MISS",
+    "M&A_DEAL", "INSIDER_BUYING", "EARNINGS_BEAT", "EARNINGS_MISS", "EARNINGS",
     "DIVIDEND_DECLARED", "BONUS_SPLIT", "NEW_LISTING",
     "REGULATORY_APPROVAL", "MANAGEMENT_CHANGE", "OTHER",
 )
@@ -15,6 +15,7 @@ EVENT_TYPES = (
 # Bullish events push +, bearish push -. Magnitude capped at ±10 total.
 EVENT_DIRECTION = {
     "M&A_DEAL": +6, "INSIDER_BUYING": +5, "EARNINGS_BEAT": +5,
+    "EARNINGS": +1,
     "DIVIDEND_DECLARED": +1, "BONUS_SPLIT": +1, "NEW_LISTING": +2,
     "REGULATORY_APPROVAL": +4, "MANAGEMENT_CHANGE": 0,
     "EARNINGS_MISS": -5, "OTHER": 0,
