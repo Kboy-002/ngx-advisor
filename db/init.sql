@@ -61,6 +61,30 @@ CREATE TABLE IF NOT EXISTS symbol_meta (
   name TEXT,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS research_notes (
+  id SERIAL PRIMARY KEY,
+  published DATE,
+  title TEXT NOT NULL,
+  url TEXT UNIQUE,
+  summary TEXT,
+  asi_close NUMERIC,
+  source TEXT DEFAULT 'afrinvest_substack',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS analyses (
+  id SERIAL PRIMARY KEY,
+  month TEXT NOT NULL UNIQUE,
+  payload JSONB NOT NULL,
+  model TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS digests (
+  id SERIAL PRIMARY KEY,
+  week TEXT NOT NULL UNIQUE,
+  payload JSONB NOT NULL,
+  model TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS picks (
   id SERIAL PRIMARY KEY,
   month TEXT NOT NULL UNIQUE,       -- 'YYYY-MM'

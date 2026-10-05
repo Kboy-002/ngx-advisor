@@ -52,6 +52,19 @@ CREATE TABLE IF NOT EXISTS symbol_meta (
 );
 ALTER TABLE prices_eod ADD COLUMN IF NOT EXISTS week_change_pct NUMERIC;
 ALTER TABLE prices_eod ADD COLUMN IF NOT EXISTS volume BIGINT;
+CREATE TABLE IF NOT EXISTS research_notes (
+  id SERIAL PRIMARY KEY, published DATE, title TEXT NOT NULL,
+  url TEXT UNIQUE, summary TEXT, asi_close NUMERIC,
+  source TEXT DEFAULT 'afrinvest_substack', created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS analyses (
+  id SERIAL PRIMARY KEY, month TEXT NOT NULL UNIQUE,
+  payload JSONB NOT NULL, model TEXT, created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS digests (
+  id SERIAL PRIMARY KEY, week TEXT NOT NULL UNIQUE,
+  payload JSONB NOT NULL, model TEXT, created_at TIMESTAMPTZ DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS picks (
   id SERIAL PRIMARY KEY, month TEXT NOT NULL UNIQUE,
   cash_amount NUMERIC NOT NULL, picks JSONB NOT NULL, rationale TEXT,
@@ -172,6 +185,78 @@ def all_meta() -> dict:
     with conn() as c:
         cur = c.execute("SELECT symbol, sector, name FROM symbol_meta")
         return {r[0]: {"sector": r[1], "name": r[2]} for r in cur.fetchall()}
+
+
+# --- research / analyses / digests ---
+
+def save_research_note(published, title: str, url: str, summary: str,
+                       asi_close: float | None) -> bool:
+    with conn() as c:
+        cur = c.execute(
+            """INSERT INTO research_notes (published, title, url, summary, asi_close)
+               VALUES (%s,%s,%s,%s,%s) ON CONFLICT (url) DO UPDATE SET
+               summary=EXCLUDED.summary, published=EXCLUDED.published,
+               asi_close=COALESCE(EXCLUDED.asi_close, research_notes.asi_close)
+               RETURNING id""",
+            (published, title, url, summary, asi_close),
+        )
+        return cur.fetchone() is not None
+
+
+def latest_research(limit: int = 3) -> list[dict]:
+    with conn() as c:
+        cur = c.execute(
+            """SELECT published, title, url, summary, asi_close FROM research_notes
+               ORDER BY published DESC NULLS LAST LIMIT %s""", (limit,))
+        return [{"published": str(r[0]) if r[0] else None, "title": r[1], "url": r[2],
+                 "summary": (r[3] or "")[:1500], "asi_close": float(r[4]) if r[4] else None}
+                for r in cur.fetchall()]
+
+
+def save_analysis(month: str, payload: dict, model: str) -> None:
+    import json
+
+    with conn() as c:
+        c.execute(
+            """INSERT INTO analyses (month, payload, model) VALUES (%s,%s,%s)
+               ON CONFLICT (month) DO UPDATE SET payload=EXCLUDED.payload,
+               model=EXCLUDED.model, created_at=now()""",
+            (month, json.dumps(payload), model),
+        )
+
+
+def get_analysis(month: str) -> dict | None:
+    with conn() as c:
+        cur = c.execute("SELECT payload, model, created_at FROM analyses WHERE month=%s", (month,))
+        r = cur.fetchone()
+        return {"payload": r[0], "model": r[1], "created_at": str(r[2])} if r else None
+
+
+def save_digest(week: str, payload: dict, model: str) -> None:
+    import json
+
+    with conn() as c:
+        c.execute(
+            """INSERT INTO digests (week, payload, model) VALUES (%s,%s,%s)
+               ON CONFLICT (week) DO UPDATE SET payload=EXCLUDED.payload,
+               model=EXCLUDED.model, created_at=now()""",
+            (week, json.dumps(payload), model),
+        )
+
+
+def get_latest_digest() -> dict | None:
+    with conn() as c:
+        cur = c.execute("SELECT week, payload, model FROM digests ORDER BY week DESC LIMIT 1")
+        r = cur.fetchone()
+        return {"week": r[0], "payload": r[1], "model": r[2]} if r else None
+
+
+def asi_series(limit: int = 60) -> list[dict]:
+    with conn() as c:
+        cur = c.execute(
+            "SELECT trade_date, asi FROM market_snapshots WHERE asi IS NOT NULL "
+            "ORDER BY trade_date DESC LIMIT %s", (limit,))
+        return [{"date": str(r[0]), "asi": float(r[1])} for r in cur.fetchall()]
 
 
 # --- cash / picks / holdings / signals ---

@@ -125,6 +125,63 @@ def status():
     return out
 
 
+class AnalystRequest(BaseModel):
+    cash: float = Field(gt=0)
+    month: str | None = None
+
+
+@app.post("/analyst/monthly")
+def analyst_monthly(req: AnalystRequest):
+    import analyst as analystmod
+
+    try:
+        return analystmod.monthly_analysis(req.cash, req.month)
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+@app.get("/analyst/monthly/{month}")
+def analyst_monthly_get(month: str):
+    try:
+        res = store.get_analysis(month)
+        return res or {"error": f"no analysis stored for {month}"}
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+@app.post("/analyst/weekly")
+def analyst_weekly():
+    import analyst as analystmod
+
+    try:
+        return analystmod.weekly_digest()
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+@app.get("/analyst/weekly/latest")
+def analyst_weekly_latest():
+    try:
+        res = store.get_latest_digest()
+        return res or {"empty": True}
+    except Exception as exc:
+        return {"empty": True, "error": str(exc)}
+
+
+@app.post("/research/fetch")
+def research_fetch(backfill: bool = False):
+    import research as researchmod
+
+    try:
+        out = researchmod.fetch_weekly()
+        if backfill:
+            out["backfill"] = researchmod.backfill_archive()
+        out["editions"] = len(store.latest_research(200))
+        return out
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
 class Candidate(BaseModel):
     symbol: str
     price: float = Field(gt=0)

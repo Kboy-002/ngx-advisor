@@ -84,6 +84,30 @@ def render() -> None:
     if picks and picks.get("picks"):
         _pick_teaser(picks["picks"][0])
 
+    st.divider()
+    st.markdown("### This week's brief")
+    digest, _ = api_get("/analyst/weekly/latest")
+    if digest and not digest.get("empty") and digest.get("payload"):
+        p = digest["payload"]
+        st.markdown(f'<div class="card"><h4>{p.get("headline", "Weekly brief")}</h4>'
+                    f'<div class="muted">{p.get("market_summary", "")}</div></div>',
+                    unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**What moved**")
+            for b in p.get("what_moved", [])[:5]:
+                st.markdown(f"<div class='ev'>• {b}</div>", unsafe_allow_html=True)
+            st.markdown("**Watch next week**")
+            for b in p.get("watch_next_week", [])[:3]:
+                st.markdown(f"<div class='ev'>👀 {b}</div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown("**Portfolio notes**")
+            for b in p.get("portfolio_notes", [])[:4]:
+                st.markdown(f"<div class='ev'>• {b}</div>", unsafe_allow_html=True)
+        st.caption(f"Week of {digest.get('week')} · model {digest.get('model', '?')}")
+    else:
+        st.caption("No weekly brief yet — it lands automatically every Saturday morning.")
+
 
 def _pick_teaser(p: dict) -> None:
     legs = " + ".join(l["symbol"] for l in p.get("picks", []))

@@ -42,6 +42,55 @@ def _pick_cards(picks: list[dict]) -> None:
                     st.markdown(f"<div class='ev'>⚠️ {r}</div>", unsafe_allow_html=True)
 
 
+def _analyst_section(cash: float) -> None:
+    from datetime import date as _d
+    st.markdown("### AI analyst deep-dive")
+    st.caption("Grounded reasoning over the same numbers above — bull/bear, risks, catalysts. "
+               "Advisory only: the quant rank still makes the call.")
+    month = _d.today().strftime("%Y-%m")
+    stored, _ = api_get(f"/analyst/monthly/{month}")
+    if stored and "error" not in stored:
+        _render_analysis(stored.get("payload", {}), stored.get("model", "?"))
+    else:
+        st.info("No deep-dive for this month yet.")
+    if st.button("🧠 Run AI deep-dive", help="Analyzes the top candidates. Uses your LLM key; costs a few cents."):
+        with st.spinner("Analyst at work — reading scores, signals and outlook…"):
+            res, err = api_post("/analyst/monthly", json={"cash": cash}, timeout=300.0)
+        if err or not res or res.get("error"):
+            st.warning((res or {}).get("error") if res else
+                       "Analyst unreachable. If it mentions LLM_API_KEY, add your DeepSeek key to .env and restart.")
+        else:
+            _render_analysis(res, res.get("model", "?"))
+
+
+def _render_analysis(payload: dict, model: str) -> None:
+    st.caption(f"Model: {model} · verify every figure against the evidence above before acting.")
+    if payload.get("market_read"):
+        st.markdown(f'<div class="card"><h4>Market read</h4>'
+                    f'<div class="muted">{payload["market_read"]}</div></div>', unsafe_allow_html=True)
+    for a in payload.get("analyses", []):
+        conf = a.get("confidence", 0)
+        with st.expander(f"{a.get('symbol')} — {a.get('verdict', '?')} (confidence {conf})", expanded=False):
+            st.markdown(f"**Thesis:** {a.get('thesis', '—')}")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("**Bull case**")
+                for b in a.get("bull_case", []):
+                    st.markdown(f"<div class='ev'>🟢 {b}</div>", unsafe_allow_html=True)
+                st.markdown("**Catalysts**")
+                for b in a.get("catalysts", []):
+                    st.markdown(f"<div class='ev'>⚡ {b}</div>", unsafe_allow_html=True)
+            with c2:
+                st.markdown("**Bear case**")
+                for b in a.get("bear_case", []):
+                    st.markdown(f"<div class='ev'>🔴 {b}</div>", unsafe_allow_html=True)
+                st.markdown("**Key risks**")
+                for b in a.get("key_risks", []):
+                    st.markdown(f"<div class='ev'>⚠️ {b}</div>", unsafe_allow_html=True)
+    if payload.get("suggested_focus"):
+        st.success(f"Suggested focus: {payload['suggested_focus']}")
+
+
 def render(cash: float) -> None:
     st.markdown("### This month's instruction")
     st.caption("One clear buy (or a pair, only if earned). Backed by numbers, not vibes.")
@@ -84,3 +133,6 @@ def render(cash: float) -> None:
         empty_state("No pick yet",
                     "Press <b>Generate this month's pick</b> and the engine will screen the market "
                     "for exactly what to buy with your cash.")
+
+    st.divider()
+    _analyst_section(cash)
