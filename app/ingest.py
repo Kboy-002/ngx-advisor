@@ -181,7 +181,9 @@ def run_and_store() -> dict:
                        "eps_growth", "debt_equity", "dividend_yield") if data.get(k) is not None}
             if fields:
                 store.upsert_fundamentals(sym, "latest", fields)
-    return {"prices": n, "asi": asi}
+    return {"prices": n, "asi": asi, "source": source,
+            "note": "NGX scrape is bot-walled; Kobo is the live path" if source == "kobo" else
+                    "Kobo unreachable — NGX scrape fallback (often bot-walled)"}
 
 
 def fetch_ngnmarket_snapshot(symbols: list[str]) -> dict:

@@ -52,10 +52,19 @@ def _pack_for(symbols: list[str], ranked: list[dict]) -> str:
     outlook = "\n".join(
         f"- {r['published']}: {r['title']} (ASI {r['asi_close'] or 'n/a'}) {r['url']}\n  {(r['summary'] or '')[:800]}"
         for r in research) or "- no Afrinvest weekly on file yet"
+    street_lines = []
+    for s in symbols:
+        for v in store.street_for(s):
+            street_lines.append(
+                f"- {s}: {v['broker']} {v['period'] or ''} → {v['recommendation'] or 'no rating'}"
+                + (f", TP ₦{v['target_price']:,.2f}" if v['target_price'] else "")
+                + f" {v['url']}")
+    street = "\n".join(street_lines) or "- no broker notes on file for these names"
     asi = store.asi_series(8)
     asi_txt = ", ".join(f"{a['date']}={a['asi']:,.0f}" for a in reversed(asi)) or "n/a"
     return ("CANDIDATES (top quant-ranked):\n" + "\n".join(lines)
             + f"\n\nAFRINVEST WEEKLY OUTLOOK:\n{outlook}"
+            + f"\n\nSTREET VIEW (broker notes):\n{street}"
             + f"\n\nASI RECENT: {asi_txt}")
 
 

@@ -72,10 +72,13 @@ db/init.sql          # Postgres schema
 
 ## Data sources (free-first)
 
-- NGX equities price list (public scrape, best-effort) + ASI context
-- NGN Market free tier (3,000 calls/mo, optional key) for fundamentals/dividends
-- NGX disclosures + NGX Pulse + Nairametrics/Proshare RSS + top-10 candidate IR pages (Phase 2 collector)
-- Official NGX Market Data API is the paid upgrade path if free scraping ever breaks.
+- Kobo Terminal Personal key (free, 100 req/day): all 150+ NGX prices + ASI + sectors — the live path
+- NGX official weekly P/E PDFs (free, open doclib): P/E + market caps, sanity-gated
+- topchor.com per-stock pages (free): EPS, dividend yield, ROE, RSI → our P/E is computed as live price ÷ EPS
+- CardinalStone research PDFs (free portal): ROE, P/B, debt/equity, target prices, ratings ("street view")
+- Afrinvest Research Substack (free): weekly outlook + ASI archive backfill
+- Nairametrics / BusinessDay / Punch RSS: tagged signals + earnings extraction
+- NGX website scrape: deprecated fallback (bot-walled since day one; kept in code, not relied upon)
 
 ## Roadmap
 

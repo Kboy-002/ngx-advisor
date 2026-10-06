@@ -85,6 +85,25 @@ def ingest_earnings():
         return {"error": str(exc)}
 
 
+@app.post("/ingest/brokers")
+def ingest_brokers():
+    """Fetch new CardinalStone research PDFs + extract ratio tables (uses LLM key)."""
+    import brokers as brokersmod
+
+    try:
+        return brokersmod.run_brokers()
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+@app.get("/street/{symbol}")
+def street(symbol: str):
+    try:
+        return {"symbol": symbol.upper(), "views": store.street_for(symbol.upper())}
+    except Exception as exc:
+        return {"symbol": symbol.upper(), "views": [], "error": str(exc)}
+
+
 @app.post("/research/fetch")
 def research_fetch(backfill: bool = False):
     import research as researchmod
@@ -243,3 +262,37 @@ class AllocateRequest(BaseModel):
 @app.post("/allocate")
 def allocate(req: AllocateRequest):
     return {"allocations": allocator.allocate(req.cash, req.ranked, req.portfolio)}
+
+
+class GutRequest(BaseModel):
+    trade_date: str  # YYYY-MM-DD
+    symbol: str
+    units: float = Field(gt=0)
+    price: float = Field(gt=0)
+    note: str | None = None
+
+
+@app.post("/gut")
+def gut_log(req: GutRequest):
+    from datetime import datetime as _dt
+
+    try:
+        store.save_gut(_dt.strptime(req.trade_date, "%Y-%m-%d").date(),
+                       req.symbol, req.units, req.price, req.note)
+        return {"ok": True}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+@app.get("/gut")
+def gut_list():
+    try:
+        guts = store.list_guts()
+        latest = {p["symbol"]: p["close"] for p in store.latest_prices()}
+        for g in guts:
+            if g["symbol"] in latest and g["price"] > 0:
+                g["return_pct"] = round((latest[g["symbol"]] / g["price"] - 1) * 100, 2)
+                g["now_price"] = latest[g["symbol"]]
+        return {"guts": guts}
+    except Exception as exc:
+        return {"guts": [], "error": str(exc)}

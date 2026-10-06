@@ -45,6 +45,17 @@ def _pick_cards(picks: list[dict]) -> None:
                 st.markdown("**Risks — read before you buy**")
                 for r in risks:
                     st.markdown(f"<div class='ev'>⚠️ {r}</div>", unsafe_allow_html=True)
+            st.markdown("**Street view — what brokers say**")
+            street, _ = api_get(f"/street/{a['symbol']}", timeout=20.0)
+            views = (street or {}).get("views", []) if street else []
+            if views:
+                for v in views:
+                    tp = f", TP ₦{v['target_price']:,.2f}" if v.get("target_price") else ""
+                    st.markdown(f"<div class='sig'>🏦 {v['broker']} {v.get('period') or ''} → "
+                                f"<b>{v.get('recommendation') or 'no rating'}</b>{tp} "
+                                f"<a href=\"{v['url']}\">note</a></div>", unsafe_allow_html=True)
+            else:
+                st.caption("No broker notes on file for this name yet — Saturday's sweep covers new PDFs.")
 
 
 def _analyst_section(cash: float) -> None:

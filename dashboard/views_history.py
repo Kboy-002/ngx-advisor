@@ -4,7 +4,7 @@ from __future__ import annotations
 import plotly.graph_objects as go
 import streamlit as st
 
-from components import api_get, empty_state, naira0
+from components import api_get, api_post, empty_state, naira0
 
 
 def _comparison_chart(perfs: list[dict]):
@@ -71,4 +71,37 @@ def render() -> None:
         st.markdown(
             f'<div class="card"><h4>{p["month"]} — {legs}</h4>'
             f'<div class="muted">{naira0(p.get("cash"))} deployed{line}</div></div>',
+            unsafe_allow_html=True)
+
+    st.divider()
+    with st.expander("Log an off-system (gut) trade — keep the record honest"):
+        st.caption("Bought on a tip outside the machine? Log it here. It gets scored against the ASI "
+                   "like everything else — no shame, just data.")
+        gc1, gc2, gc3 = st.columns(3)
+        with gc1:
+            gsym = st.text_input("Ticker", placeholder="GTCO").upper()
+            gunits = st.number_input("Units", min_value=0.0, value=0.0, step=1.0)
+        with gc2:
+            gprice = st.number_input("Buy price (₦)", min_value=0.0, value=0.0, step=0.5)
+            gdate = st.date_input("Buy date")
+        with gc3:
+            gnote = st.text_input("Why? (one line)", placeholder="Heard it at lunch")
+        if st.button("Log gut trade"):
+            if gsym and gunits > 0 and gprice > 0:
+                res, err = api_post("/gut", json={"trade_date": str(gdate), "symbol": gsym,
+                                                  "units": gunits, "price": gprice, "note": gnote})
+                if err or not (res or {}).get("ok"):
+                    st.error("Couldn't save it — try again.")
+                else:
+                    st.success("Logged. The scoreboard is watching.")
+                    st.rerun()
+            else:
+                st.warning("Ticker, units and price are all required.")
+    guts, _ = api_get("/gut")
+    for g in (guts or {}).get("guts", []):
+        perf = (f" · {g['return_pct']:+.1f}% (now ₦{g['now_price']:,.2f})"
+                if "return_pct" in g else " · awaiting prices")
+        st.markdown(
+            f'<div class="card verdict PAUSE"><h4>🎲 {g["symbol"]} ×{g["units"]:,.0f} @ ₦{g["price"]:,.2f}</h4>'
+            f'<div class="muted">{g["date"]}{perf} · {g.get("note") or "no reason given"}</div></div>',
             unsafe_allow_html=True)

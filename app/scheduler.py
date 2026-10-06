@@ -49,6 +49,15 @@ def job_saturday_earnings():
         log.warning("earnings failed: %s", exc)
 
 
+def job_saturday_brokers():
+    log.info("saturday brokers: fetching CardinalStone research PDFs")
+    try:
+        from brokers import run_brokers
+        log.info("brokers done: %s", run_brokers())
+    except Exception as exc:
+        log.warning("brokers failed: %s", exc)
+
+
 def job_saturday_digest():
     log.info("Saturday digest: Afrinvest weekly + AI weekly brief")
     try:
@@ -110,6 +119,7 @@ def main():
     sched.add_job(job_saturday_nudge, CronTrigger(day_of_week="sat", hour=8, minute=0))
     sched.add_job(job_saturday_digest, CronTrigger(day_of_week="sat", hour=9, minute=30))
     sched.add_job(job_saturday_earnings, CronTrigger(day_of_week="sat", hour=10, minute=0))
+    sched.add_job(job_saturday_brokers, CronTrigger(day_of_week="sat", hour=11, minute=0))
     sched.add_job(job_monthly_pick, CronTrigger(day=27, hour=8, minute=0))
     sched.add_job(job_monthly_analysis, CronTrigger(day=27, hour=7, minute=0))
     log.info("scheduler started (Africa/Lagos). Next: %s", sched.get_jobs() and "jobs armed")

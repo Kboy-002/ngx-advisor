@@ -66,6 +66,8 @@ def build_candidates() -> tuple[list[dict], bool]:
         else:
             thin = False if mom.get("ret_6m") is not None else thin
         evts = store.signals_for(sym)
+        if (mom.get("ret_7d") is not None and abs(mom["ret_7d"]) > 25 and not evts):
+            mom["spike_unguarded"] = True
         adj, notes = overlay_for(
             [{"event_type": e["event_type"], "title": e["title"], "source": e["source"],
               "source_tier": e["source_tier"], "url": e["url"]} for e in evts])

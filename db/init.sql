@@ -93,6 +93,26 @@ CREATE TABLE IF NOT EXISTS earnings_extracts (
   payload JSONB,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS gut_trades (
+  id SERIAL PRIMARY KEY,
+  trade_date DATE NOT NULL,
+  symbol TEXT NOT NULL,
+  units NUMERIC NOT NULL,
+  price NUMERIC NOT NULL,
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS broker_views (
+  id SERIAL PRIMARY KEY,
+  url TEXT NOT NULL UNIQUE,
+  broker TEXT,
+  symbol TEXT,
+  period TEXT,
+  recommendation TEXT,
+  target_price NUMERIC,
+  payload JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS picks (
   id SERIAL PRIMARY KEY,
   month TEXT NOT NULL UNIQUE,       -- 'YYYY-MM'

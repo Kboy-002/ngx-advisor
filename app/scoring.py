@@ -21,14 +21,21 @@ def _num(x, default=None):
         return default
 
 
-def score_momentum(ret_3m=None, ret_6m=None, ret_7d=None, vs_asi_3m=None, pos_52w=None, vol_trend=None) -> tuple[float, list[str]]:
+def score_momentum(ret_3m=None, ret_6m=None, ret_7d=None, vs_asi_3m=None, pos_52w=None, vol_trend=None, spike_unguarded=False) -> tuple[float, list[str]]:
     ev: list[str] = []
     parts: list[float] = []
     ret_3m, ret_6m, ret_7d = _num(ret_3m), _num(ret_6m), _num(ret_7d)
     vs_asi_3m, pos_52w, vol_trend = _num(vs_asi_3m), _num(pos_52w), _num(vol_trend)
     if ret_7d is not None:
-        parts.append(_clamp(50 + ret_7d * 4.0))
-        ev.append(f"7-day move {ret_7d:+.1f}%")
+        w = 4.0
+        # Spike governor: a lone >25% week with no linked signal counts half —
+        # thrills need receipts.
+        if spike_unguarded and abs(ret_7d) > 25:
+            w = 2.0
+            ev.append(f"7-day move {ret_7d:+.1f}% — unguarded spike, halved")
+        else:
+            ev.append(f"7-day move {ret_7d:+.1f}%")
+        parts.append(_clamp(50 + ret_7d * w))
     if ret_3m is not None:
         parts.append(_clamp(50 + ret_3m * 1.5))
         ev.append(f"3-mo return {ret_3m:+.1f}%")
@@ -137,7 +144,11 @@ def rank_candidates(candidates: list[dict]) -> list[dict]:
     out = []
     for c in candidates:
         m, m_ev = score_momentum(**c.get("momentum", {}))
-        q, q_ev = score_quality(**c.get("quality", {}))
+        q_in = dict(c.get("quality", {}))
+        q_in["rev_growth"] = q_in.pop("revenue_growth", q_in.get("rev_growth"))
+        q_in["margin"] = q_in.pop("profit_margin", q_in.get("margin"))
+        q, q_ev = score_quality(**{k: v for k, v in q_in.items()
+                                   if k in ("rev_growth", "eps_growth", "roe", "margin", "debt_equity")})
         v, v_ev = score_value(**c.get("value", {}))
         r, r_ev = score_risk(**c.get("risk", {}))
         d, d_ev = score_dividend_div(**c.get("dividend", {}))

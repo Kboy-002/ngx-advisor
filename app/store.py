@@ -70,6 +70,16 @@ CREATE TABLE IF NOT EXISTS earnings_extracts (
   id SERIAL PRIMARY KEY, url TEXT NOT NULL UNIQUE,
   symbol TEXT, payload JSONB, created_at TIMESTAMPTZ DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS gut_trades (
+  id SERIAL PRIMARY KEY, trade_date DATE NOT NULL,
+  symbol TEXT NOT NULL, units NUMERIC NOT NULL, price NUMERIC NOT NULL,
+  note TEXT, created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS broker_views (
+  id SERIAL PRIMARY KEY, url TEXT NOT NULL UNIQUE,
+  broker TEXT, symbol TEXT, period TEXT, recommendation TEXT,
+  target_price NUMERIC, payload JSONB, created_at TIMESTAMPTZ DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS picks (
   id SERIAL PRIMARY KEY, month TEXT NOT NULL UNIQUE,
   cash_amount NUMERIC NOT NULL, picks JSONB NOT NULL, rationale TEXT,
@@ -273,6 +283,60 @@ def asi_series(limit: int = 60) -> list[dict]:
             "SELECT trade_date, asi FROM market_snapshots WHERE asi IS NOT NULL "
             "ORDER BY trade_date DESC LIMIT %s", (limit,))
         return [{"date": str(r[0]), "asi": float(r[1])} for r in cur.fetchall()]
+
+
+# --- gut trades (off-system buys, tracked for honesty) ---
+
+def save_gut(trade_date: date, symbol: str, units: float, price: float,
+             note: str | None = None) -> None:
+    with conn() as c:
+        c.execute(
+            """INSERT INTO gut_trades (trade_date, symbol, units, price, note)
+               VALUES (%s,%s,%s,%s,%s)""",
+            (trade_date, symbol.upper(), units, price, note),
+        )
+
+
+def list_guts() -> list[dict]:
+    with conn() as c:
+        cur = c.execute(
+            "SELECT trade_date, symbol, units, price, note FROM gut_trades ORDER BY trade_date DESC")
+        return [{"date": str(r[0]), "symbol": r[1], "units": float(r[2]),
+                 "price": float(r[3]), "note": r[4]} for r in cur.fetchall()]
+
+
+# --- broker views (street research) ---
+
+def has_broker_view(url: str) -> bool:
+    with conn() as c:
+        cur = c.execute("SELECT 1 FROM broker_views WHERE url=%s", (url,))
+        return cur.fetchone() is not None
+
+
+def save_broker_view(url: str, broker: str, symbol: str | None, period: str | None,
+                     recommendation: str | None, target_price: float | None,
+                     payload: dict) -> None:
+    import json
+
+    with conn() as c:
+        c.execute(
+            """INSERT INTO broker_views (url, broker, symbol, period, recommendation,
+               target_price, payload) VALUES (%s,%s,%s,%s,%s,%s,%s)
+               ON CONFLICT (url) DO NOTHING""",
+            (url, broker, symbol, period, recommendation, target_price, json.dumps(payload)),
+        )
+
+
+def street_for(symbol: str, limit: int = 5) -> list[dict]:
+    with conn() as c:
+        cur = c.execute(
+            """SELECT broker, period, recommendation, target_price, url, created_at
+               FROM broker_views WHERE symbol=%s ORDER BY created_at DESC LIMIT %s""",
+            (symbol, limit),
+        )
+        return [{"broker": r[0], "period": r[1], "recommendation": r[2],
+                 "target_price": float(r[3]) if r[3] is not None else None,
+                 "url": r[4], "read_on": str(r[5])[:10]} for r in cur.fetchall()]
 
 
 # --- cash / picks / holdings / signals ---
