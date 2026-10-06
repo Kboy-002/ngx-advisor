@@ -115,6 +115,42 @@ def apply_analyst_overlay(ranked: list[dict], analysis: dict) -> tuple[list[dict
     return ranked, notes
 
 
+def apply_averaging_guard(ranked: list[dict], portfolio: dict | None,
+                          verdicts: dict | None = None) -> list[str]:
+    """Averaging-down guard: adding to a loser needs extra justification.
+
+    - Any buy into a held-at-loss name gets an explicit warning in risks.
+    - Loss of 15%+ without an analyst BUY costs 8 points (conviction discount).
+    Returns rationale notes.
+    """
+    verdicts = verdicts or {}
+    held = {}
+    if portfolio:
+        for h in portfolio.get("holdings", []):
+            held[h["symbol"]] = h
+    notes: list[str] = []
+    for c in ranked:
+        h = held.get(c["symbol"])
+        if not h:
+            continue
+        gain = float(h.get("gain_pct", 0) or 0)
+        if gain >= 0:
+            continue
+        c.setdefault("risks", []).append(
+            f"Averaging down: held {h.get('quantity', '?')} @ avg "
+            f"₦{float(h.get('avg_cost', 0) or 0):,.2f} ({gain:+.1f}%) — this buy must earn its place")
+        verdict = str((verdicts.get(c["symbol"]) or {}).get("verdict", "NEUTRAL")).upper()
+        if gain <= -15 and verdict != "BUY":
+            c["score"] = round(max(0.0, c["score"] - 8.0), 1)
+            c["analyst_overlay"] = float(c.get("analyst_overlay", 0.0)) - 8.0
+            notes.append(f"{c['symbol']}: averaging-down discount −8 "
+                         f"(held {gain:.0f}%, analyst {verdict})")
+    ranked.sort(key=lambda x: x["score"], reverse=True)
+    for i, c in enumerate(ranked, 1):
+        c["rank"] = i
+    return notes
+
+
 def generate_monthly_pick(cash: float, month: str | None = None,
                           analyze: bool = False) -> dict:
     """Full pipeline: DB -> ranked -> (optional AI deep-dive overlay) -> allocated -> persisted."""
@@ -153,6 +189,10 @@ def generate_monthly_pick(cash: float, month: str | None = None,
               "sectors": {h["symbol"]: _sec(h["symbol"]) for h in portfolio["holdings"]}}
     for c in ranked:
         c["sector_live"] = _sec(c["symbol"])
+    guard_notes: list[str] = []
+    if portfolio:
+        verdicts = {a.get("symbol"): a for a in ((analysis or {}).get("analyses") or [])}
+        guard_notes = apply_averaging_guard(ranked, portfolio, verdicts)
     allocs = allocator.allocate(cash, ranked, pf)
     asi = store.latest_asi()
     rationale = (
@@ -160,6 +200,7 @@ def generate_monthly_pick(cash: float, month: str | None = None,
         + (" (price history still warming — momentum seeded, treat ranks as provisional)" if warming else "")
         + (f". {skipped} thin name(s) excluded: ticket exceeds 20% of daily turnover." if skipped else "")
         + (f". AI overlay applied: {'; '.join(reconciliation)}." if reconciliation else "")
+        + (f". Averaging-down guard: {'; '.join(guard_notes)}." if guard_notes else "")
         + f". Concentration guardrails vs {len(pf['holdings']) if pf else 0} held tickers."
     )
     store.record_cash(month, cash)
